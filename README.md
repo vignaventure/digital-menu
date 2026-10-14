@@ -45,7 +45,7 @@ Deploy from this repo using the `Dockerfile`; attach a persistent disk/volume mo
 ### Moving from the old SQLite version
 If you ran an earlier version that kept data in `DATA_DIR/app.db`, copy it into MongoDB once (ids, logins and photos are kept; run it again safely; everyone logs in again):
 ```bash
-MONGODB_URI="..." node scripts/migrate-sqlite-to-mongo.js /var/lib/digital-menu/app.db
+node --env-file=/etc/digital-menu/env scripts/migrate-sqlite-to-mongo.js /var/lib/digital-menu/app.db   # or: MONGODB_URI="..." node scripts/…
 ```
 
 ### Backups

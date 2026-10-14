@@ -127,7 +127,7 @@ Copy `/var/backups/digital-menu` off the server occasionally (rsync/S3): a backu
 3. First start creates the collections, indexes and the super admin.
 4. **Coming from the old SQLite version?** Copy the data once (ids, logins, photos kept; safe to run twice):
 ```bash
-cd /opt/digital-menu && set -a && . /etc/digital-menu/env && set +a && node scripts/migrate-sqlite-to-mongo.js /var/lib/digital-menu/app.db
+cd /opt/digital-menu && node --env-file=/etc/digital-menu/env scripts/migrate-sqlite-to-mongo.js /var/lib/digital-menu/app.db
 ```
 
 ## Troubleshooting
