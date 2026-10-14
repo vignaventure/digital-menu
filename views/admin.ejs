@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Menu Card</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="top"><div class="wrap"><b>Menu Card · Super Admin</b>
+  <form method="post" action="/logout"><button class="ghost">Logout</button></form></div></div>
+<div class="wrap grid2">
+  <form class="panel" method="post" action="/admin/restaurants">
+    <h3>Onboard restaurant</h3>
+    <% if (error) { %><div class="err"><%= error %></div><% } %>
+    <label>Restaurant name</label><input name="name" required>
+    <label>Owner login email</label><input type="email" name="email" required>
+    <label>Initial password (min 6)</label><input name="password" minlength="6" required>
+    <label>Price paid</label><input type="number" name="price_paid" min="0" step="0.01" value="0">
+    <label>Plan valid until (optional)</label><input type="date" name="plan_expires">
+    <p><button>Create account</button></p>
+  </form>
+  <div class="panel table-scroll">
+    <h3>Restaurants (<%= rows.length %>)</h3>
+    <table><tr><th>Name</th><th>Login</th><th>Paid</th><th>Until</th><th>Items</th><th>Status</th><th></th></tr>
+    <% rows.forEach(r => { %>
+      <tr>
+        <td><a href="<%= base %>/m/<%= r.slug %>" target="_blank"><%= r.name %></a></td>
+        <td><%= r.email %></td><td><%= r.price_paid %></td><td><%= r.plan_expires || '—' %></td><td><%= r.item_count %></td>
+        <td><span class="tag <%= r.active ? 'ok' : 'off' %>"><%= r.active ? 'Active' : 'Disabled' %></span></td>
+        <td><div class="row">
+          <form method="post" action="/admin/restaurants/<%= r.id %>/toggle"><button class="ghost"><%= r.active ? 'Disable' : 'Enable' %></button></form>
+          <form method="post" action="/admin/restaurants/<%= r.id %>/password" class="row">
+            <input name="password" placeholder="New password" minlength="6" style="width:130px"><button class="ghost">Reset</button></form>
+        </div></td>
+      </tr>
+    <% }) %></table>
+  </div>
+</div></body></html>

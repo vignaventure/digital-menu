@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard · <%= r.name %></title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="top noprint"><div class="wrap"><b><%= r.name %></b>
+  <div class="row"><a class="btn ghost" href="/m/<%= r.slug %>" target="_blank">View menu</a>
+  <form method="post" action="/logout"><button class="ghost">Logout</button></form></div></div></div>
+
+<div class="wrap grid2">
+  <div>
+    <div class="panel qrbox">
+      <h3>Your QR code</h3>
+      <img src="/dashboard/qr.png" alt="Menu QR code">
+      <p style="font-size:.8rem;color:var(--mute);word-break:break-all"><%= base %>/m/<%= r.slug %></p>
+      <div class="row noprint" style="justify-content:center">
+        <a class="btn" href="/dashboard/qr.png?download=1">Download</a>
+        <button class="ghost" onclick="window.print()">Print</button></div>
+    </div>
+
+    <div class="panel noprint">
+      <h3>Categories</h3>
+      <form method="post" action="/dashboard/categories" class="row">
+        <input name="name" placeholder="e.g. Starters" required style="flex:1"><button>Add</button></form>
+      <% categories.forEach(c => { %>
+        <div class="row" style="justify-content:space-between;margin-top:8px"><span><%= c.name %></span>
+          <form method="post" action="/dashboard/categories/<%= c.id %>/delete"
+                onsubmit="return confirm('Delete category and all its items?')"><button class="ghost danger" style="color:#fff">Delete</button></form></div>
+      <% }) %>
+    </div>
+
+    <form class="panel noprint" method="post" action="/dashboard/items" enctype="multipart/form-data">
+      <h3><%= edit ? 'Edit item' : 'Add item' %></h3>
+      <% if (error) { %><div class="err"><%= error %></div><% } %>
+      <% if (!categories.length) { %><p style="color:var(--mute)">Create a category first.</p><% } %>
+      <% if (edit) { %><input type="hidden" name="id" value="<%= edit.id %>"><% } %>
+      <label>Name</label><input name="name" required value="<%= edit ? edit.name : '' %>">
+      <label>Description</label><textarea name="description"><%= edit ? edit.description : '' %></textarea>
+      <label>Price</label><input type="number" name="price" min="0" step="0.01" required value="<%= edit ? edit.price : '' %>">
+      <label>Category</label>
+      <select name="category_id" required>
+        <% categories.forEach(c => { %><option value="<%= c.id %>" <%= edit && edit.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <label>Image <%= edit ? '(leave empty to keep current)' : '' %></label>
+      <input type="file" name="image" accept="image/*">
+      <p class="row"><button <%= categories.length ? '' : 'disabled' %>><%= edit ? 'Save changes' : 'Add item' %></button>
+        <% if (edit) { %><a class="btn ghost" href="/dashboard">Cancel</a><% } %></p>
+    </form>
+  </div>
+
+  <div class="panel noprint table-scroll" id="items">
+    <h3>Menu items (<%= items.length %>)</h3>
+    <% if (!items.length) { %><p class="empty">No items yet.</p><% } else { %>
+    <table><tr><th></th><th>Item</th><th>Category</th><th>Price</th><th></th></tr>
+    <% items.forEach(i => { %>
+      <tr style="<%= i.available ? '' : 'opacity:.5' %>">
+        <td><% if (i.image) { %><img class="thumb" src="/uploads/<%= i.image %>" alt=""><% } else { %><div class="thumb"></div><% } %></td>
+        <td><b><%= i.name %></b><br><small style="color:var(--mute)"><%= (i.description || '').slice(0, 60) %></small></td>
+        <td><%= i.category %></td><td><%= i.price %></td>
+        <td><div class="row">
+          <a class="btn ghost" href="/dashboard?edit=<%= i.id %>">Edit</a>
+          <form method="post" action="/dashboard/items/<%= i.id %>/toggle"><button class="ghost"><%= i.available ? 'Hide' : 'Show' %></button></form>
+          <form method="post" action="/dashboard/items/<%= i.id %>/delete" onsubmit="return confirm('Delete item?')"><button class="danger">Delete</button></form>
+        </div></td>
+      </tr>
+    <% }) %></table><% } %>
+  </div>
+</div></body></html>
