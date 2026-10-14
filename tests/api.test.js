@@ -212,3 +212,29 @@ test('owner dashboard, admin list and public menu pages render', async () => {
   assert.match(menu, /Dal/);
   assert.match(menu, /name="viewport"/);
 });
+
+test('one-time login details after create and reset; hash never exposed', async () => {
+  const adminLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=admin@test.com&password=AdminPass123' });
+  const cookie = adminLogin.headers.get('set-cookie').split(';')[0];
+  const form = body => ({ method: 'POST', redirect: 'manual', headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' }, body });
+  const page = async () => (await fetch(base + '/admin', { headers: { cookie } })).text();
+
+  const created = await fetch(base + '/admin/restaurants', form('name=Creds+Cafe&mobile=9000000077&email=&password=Sh0wMe0nce&price_paid=1&plan_type=one_time&plan_expires='));
+  assert.equal(created.status, 302);
+  const first = await page();
+  assert.match(first, /Sh0wMe0nce/);          // shown once...
+  assert.match(first, /9000000077/);
+  assert.ok(!(await page()).includes('Sh0wMe0nce')); // ...then gone
+
+  const id = (await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000077', password: 'Sh0wMe0nce' } })).body.user.restaurant_id;
+  const reset = await fetch(base + `/admin/restaurants/${id}/reset-password`, form(''));
+  assert.equal(reset.status, 302);
+  const shown = /id="c-pass" class="mono">([^<]+)</.exec(await page());
+  assert.ok(shown && shown[1].length >= 10);
+  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000077', password: 'Sh0wMe0nce' } })).status, 401); // old password dead
+  assert.ok(await login('9000000077', shown[1]));                                                                                       // new one works
+
+  // API responses never include the hash
+  const admin = await login('admin@test.com', 'AdminPass123');
+  assert.ok(!JSON.stringify((await call('GET', '/api/v1/admin/restaurants', { token: admin })).body).includes('password_hash'));
+});

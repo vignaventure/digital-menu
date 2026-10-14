@@ -42,8 +42,11 @@ router.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/lo
 function adminPage(req, res, { status = 200, error, ok, editId = req.query.edit, form } = {}) {
   let edit = null;
   if (editId) try { edit = svc.getRestaurant(Number(editId)); } catch {}
+  // one-time login details (set after create / password change); shown once, then discarded
+  const credentials = req.session.credentials || null;
+  delete req.session.credentials;
   res.status(status).render('admin', {
-    rows: svc.listRestaurants(), edit, form: form || null,
+    rows: svc.listRestaurants(), edit, form: form || null, credentials,
     error: error ?? req.query.error, ok: ok ?? req.query.ok, base: BASE_URL,
   });
 }
@@ -55,20 +58,31 @@ function fail(req, res, e, extra) {
 router.get('/admin', need('admin'), (req, res) => adminPage(req, res));
 router.post('/admin/restaurants', need('admin'), (req, res) => {
   try {
-    svc.createRestaurant(req.body);
-    res.redirect('/admin?ok=' + encodeURIComponent(`Restaurant created. Owner can log in with ${req.body.mobile}.`));
+    const r = svc.createRestaurant(req.body);
+    req.session.credentials = { title: 'Restaurant created', name: r.name, mobile: r.mobile, email: r.email, password: req.body.password };
+    res.redirect('/admin');
   } catch (e) { fail(req, res, e, { form: req.body }); }
 });
 router.post('/admin/restaurants/:id', need('admin'), (req, res) => {
   try {
     const b = { ...req.body };
     if (!b.password) delete b.password; // blank = keep current password
-    svc.updateRestaurant(Number(req.params.id), b);
+    const r = svc.updateRestaurant(Number(req.params.id), b);
+    if (b.password) req.session.credentials = { title: 'Password changed', name: r.name, mobile: r.mobile, email: r.email, password: b.password };
     res.redirect('/admin?ok=Changes+saved');
   } catch (e) { fail(req, res, e, { editId: req.params.id, form: req.body }); }
 });
 router.post('/admin/restaurants/:id/toggle', need('admin'), (req, res) => {
   svc.toggleRestaurant(req.params.id); res.redirect('/admin');
+});
+router.post('/admin/restaurants/:id/reset-password', need('admin'), (req, res) => {
+  try {
+    const r = svc.getRestaurant(Number(req.params.id));
+    const password = svc.generatePassword();
+    svc.resetOwnerPassword(r.id, password);
+    req.session.credentials = { title: 'New password generated', name: r.name, mobile: r.mobile, email: r.email, password };
+    res.redirect('/admin');
+  } catch (e) { res.redirect('/admin?error=' + msg(e)); }
 });
 router.post('/admin/restaurants/:id/delete', need('admin'), (req, res) => {
   try { svc.deleteRestaurant(req.params.id); res.redirect('/admin?ok=Restaurant+deleted'); }

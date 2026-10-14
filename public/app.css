@@ -197,3 +197,14 @@ body.modal-open{overflow:hidden}
 @keyframes mfade{from{opacity:0}to{opacity:1}}
 @keyframes mpop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.modal-back,.modal-card{animation:none}}
+
+/* ---- one-time login details card ---- */
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.box.creds{border-color:#b2f2bb;background:#f4fcf5;margin-bottom:18px}
+.box.creds h2{color:#2b8a3e}
+.creds dl{margin:0 0 12px;display:grid;gap:8px;grid-template-columns:1fr}
+@media(min-width:700px){.creds dl{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
+.creds dl div{background:#fff;border:1px solid #d3f0d8;border-radius:10px;padding:10px 12px;min-width:0}
+.creds dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
+.creds dd{margin:2px 0 0;font-weight:600;word-break:break-all}
+.creds #c-pass{font-size:1.1rem;color:var(--ink);letter-spacing:.03em}

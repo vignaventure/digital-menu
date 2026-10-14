@@ -27,6 +27,19 @@
     <div class="stat"><b><%= totalItems %></b><span>Menu items</span></div>
   </div>
 
+  <% if (credentials) { %>
+  <section class="box creds" id="creds">
+    <h2><span>✓ <%= credentials.title %>: <%= credentials.name %></span><button type="button" class="sm" id="copycreds">Copy details</button></h2>
+    <dl>
+      <div><dt>Login page</dt><dd id="c-url"><%= base %>/login</dd></div>
+      <div><dt>Mobile</dt><dd id="c-mobile"><%= credentials.mobile || '—' %></dd></div>
+      <% if (credentials.email) { %><div><dt>Email</dt><dd id="c-email"><%= credentials.email %></dd></div><% } %>
+      <div><dt>Password</dt><dd id="c-pass" class="mono"><%= credentials.password %></dd></div>
+    </dl>
+    <p class="hint">Share these with the owner now. The password is shown only this once and cannot be looked up later. Use <b>Reset password</b> to generate a new one at any time.</p>
+  </section>
+  <% } %>
+
   <div class="app-grid admin">
     <form class="box sticky <%= edit ? 'edit' : '' %>" method="post" action="<%= edit ? '/admin/restaurants/' + edit.id : '/admin/restaurants' %>" autocomplete="off">
       <h2><%= edit ? 'Edit restaurant' : 'Onboard restaurant' %><% if (edit) { %><small><%= edit.name %></small><% } %></h2>
@@ -104,6 +117,9 @@
             <td data-label="Actions">
               <div class="row-actions">
                 <a class="btn ghost sm" href="/admin?edit=<%= r.id %>">Edit</a>
+                <form method="post" action="/admin/restaurants/<%= r.id %>/reset-password"
+                      data-confirm="Reset password for <%= r.name %>?" data-confirm-text="A new password is generated and shown once. The old password stops working immediately."
+                      data-confirm-ok="Reset password" data-confirm-tone="brand"><button class="ghost sm">Reset password</button></form>
                 <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
                       data-confirm="Delete <%= r.name %>?" data-confirm-text="This permanently removes the restaurant, its owner login and all its menu items and photos. This cannot be undone."
                       data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form>
@@ -121,6 +137,14 @@
 
 <script src="/confirm.js"></script>
 <script>
+// copy the one-time login details to share with the owner
+const cc=document.getElementById('copycreds');
+cc&&cc.addEventListener('click',()=>{
+  const g=id=>{const e=document.getElementById(id);return e?e.textContent:''};
+  const text=['Login: '+g('c-url'),'Mobile: '+g('c-mobile'),g('c-email')&&'Email: '+g('c-email'),'Password: '+g('c-pass')].filter(Boolean).join('\n');
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(()=>{const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();});
+  cc.textContent='Copied';setTimeout(()=>cc.textContent='Copy details',1500);});
+
 // plan: only "Limited" shows (and requires) the valid-until date
 const wrap=document.getElementById('validwrap'),date=document.getElementById('plan_expires');
 document.querySelectorAll('input[name=plan_type]').forEach(r=>r.addEventListener('change',()=>{
