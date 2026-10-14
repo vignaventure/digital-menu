@@ -41,7 +41,8 @@
         <% categories.forEach(c => { %>
           <div class="cat"><span><%= c.name %></span>
             <form method="post" action="/dashboard/categories/<%= c.id %>/delete"
-                  onsubmit="return confirm('Delete this category and all its items?')"><button class="danger sm">Delete</button></form></div>
+                  data-confirm="Delete <%= c.name %>?" data-confirm-text="The category and all items in it will be permanently removed."
+                  data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form></div>
         <% }) %>
         </div>
       </section>
@@ -108,7 +109,9 @@
               <div class="item-actions">
                 <a class="btn ghost sm" href="/dashboard?edit=<%= i.id %>#item-form">Edit</a>
                 <form method="post" action="/dashboard/items/<%= i.id %>/toggle"><button class="ghost sm"><%= i.available ? 'Hide' : 'Show' %></button></form>
-                <form method="post" action="/dashboard/items/<%= i.id %>/delete" onsubmit="return confirm('Delete this item?')"><button class="danger sm">Delete</button></form>
+                <form method="post" action="/dashboard/items/<%= i.id %>/delete"
+                      data-confirm="Delete <%= i.name %>?" data-confirm-text="This dish will be removed from your menu permanently."
+                      data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form>
               </div>
             </article>
           <% }) %>
@@ -119,6 +122,7 @@
   </div>
 </main>
 
+<script src="/confirm.js"></script>
 <script>
 // live preview of the chosen photo
 const file=document.getElementById('iimg'),pv=document.getElementById('preview');

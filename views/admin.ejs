@@ -92,7 +92,10 @@
             </td>
             <td data-label="Status">
               <form method="post" action="/admin/restaurants/<%= r.id %>/toggle" class="sw-form"
-                    <% if (r.active) { %>onsubmit="return confirm('Make this restaurant inactive? Its menu and owner login will stop working.')"<% } %>>
+                    data-confirm="<%= r.active ? 'Make ' + r.name + ' inactive?' : 'Activate ' + r.name + '?' %>"
+                    data-confirm-text="<%= r.active ? 'Its menu will stop working and the owner will not be able to log in.' : 'Its menu and the owner login will start working again.' %>"
+                    data-confirm-ok="<%= r.active ? 'Make inactive' : 'Activate' %>"
+                    data-confirm-tone="<%= r.active ? 'danger' : 'brand' %>">
                 <button class="sw <%= r.active ? 'on' : '' %>" role="switch" aria-checked="<%= r.active %>"
                         aria-label="<%= r.active ? 'Active, click to deactivate' : 'Inactive, click to activate' %>"><i></i></button>
                 <span class="<%= r.active ? 'sw-on' : 'sw-off' %>"><%= r.active ? 'Active' : 'Inactive' %></span>
@@ -101,7 +104,9 @@
             <td data-label="Actions">
               <div class="row-actions">
                 <a class="btn ghost sm" href="/admin?edit=<%= r.id %>">Edit</a>
-                <form method="post" action="/admin/restaurants/<%= r.id %>/delete" onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger sm">Delete</button></form>
+                <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
+                      data-confirm="Delete <%= r.name %>?" data-confirm-text="This permanently removes the restaurant, its owner login and all its menu items and photos. This cannot be undone."
+                      data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form>
               </div>
             </td>
           </tr>
@@ -114,6 +119,7 @@
   </div>
 </main>
 
+<script src="/confirm.js"></script>
 <script>
 // plan: only "Limited" shows (and requires) the valid-until date
 const wrap=document.getElementById('validwrap'),date=document.getElementById('plan_expires');
