@@ -10,12 +10,17 @@ process.env.LOGIN_RATE_LIMIT = '10000'; // tests log in far more often than the 
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { DatabaseSync } = require('node:sqlite');
-const app = require('../app');
+const { startMongo } = require('./helpers');
 
-let base, server;
-test.before(() => new Promise(r => { server = app.listen(0, () => { base = `http://localhost:${server.address().port}`; r(); }); }));
-test.after(() => { server.close(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
+let base, server, mongo, db;
+test.before(async () => {
+  mongo = await startMongo();
+  db = require('../lib/db');
+  const app = require('../app'); // loaded after the env above so it connects to the test MongoDB
+  await db.init();
+  await new Promise(r => { server = app.listen(0, () => { base = `http://localhost:${server.address().port}`; r(); }); });
+});
+test.after(async () => { server.close(); await db.close(); await mongo.stop(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
 
 // token = bearer auth, cookie = dashboard login cookie
 const call = async (method, url, { token, cookie, json, form, headers = {} } = {}) => {
@@ -265,10 +270,8 @@ test('super admin can view the password it set (encrypted at rest); owner change
   assert.equal(shown.body.password, 'Vault#Pass1');
   assert.equal(shown.headers.get('cache-control'), 'no-store');
 
-  // never stored as plain text; login still uses a bcrypt hash
-  const raw = new DatabaseSync(path.join(process.env.DATA_DIR, 'app.db'), { readOnly: true });
-  const row = raw.prepare("SELECT password_hash, password_enc FROM users WHERE mobile='9000000055'").get();
-  raw.close();
+  // never stored as plain text in the database; login still uses a bcrypt hash
+  const row = await db.cols.users.findOne({ mobile: '9000000055' });
   assert.ok(row.password_enc && !row.password_enc.includes('Vault#Pass1'));
   assert.ok(row.password_hash.startsWith('$2'));
 

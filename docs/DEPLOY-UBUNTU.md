@@ -38,13 +38,15 @@ NODE_ENV=production
 PORT=3000
 BASE_URL=https://menu.vignadigital.com
 DATA_DIR=/var/lib/digital-menu
+MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/
+MONGODB_DB=digitalmenu
 SESSION_SECRET=$(openssl rand -hex 32)
 ADMIN_EMAIL=admin@vignadigital.com
 ADMIN_PASSWORD=CHANGE-ME-LONG-PASSWORD
 EOF
 sudo chmod 600 /etc/digital-menu/env
 ```
-Edit `ADMIN_PASSWORD` (`sudo nano /etc/digital-menu/env`). The admin is created on first start only. `BASE_URL` goes into every QR code, so get it right before printing any.
+Edit `ADMIN_PASSWORD` and `MONGODB_URI` (`sudo nano /etc/digital-menu/env`). The admin is created on first start only. `BASE_URL` goes into every QR code, so get it right before printing any.
 
 ## 5. Run as a service
 ```bash
@@ -103,26 +105,35 @@ sudo -u menucard npm ci --omit=dev
 sudo systemctl restart digital-menu
 ```
 
-## 8. Backups (daily)
+## 8. Backups
+- **Database (MongoDB Atlas):** paid clusters (M10 and up) back up automatically. The free M0 tier does not, so run `mongodump --uri "$MONGODB_URI" --db digitalmenu --out /var/backups/digital-menu/db-$(date +%F)` now and then (install `mongodb-database-tools`).
+- **Photos (on this server):**
 ```bash
-sudo apt -y install sqlite3
 sudo tee /usr/local/bin/menucard-backup >/dev/null <<'EOF'
 #!/bin/sh
 set -e
 D=/var/backups/digital-menu; mkdir -p $D
-sqlite3 /var/lib/digital-menu/app.db ".backup $D/app-$(date +%F).db"
 tar -czf $D/uploads-$(date +%F).tgz -C /var/lib/digital-menu uploads
 find $D -type f -mtime +14 -delete
 EOF
 sudo chmod +x /usr/local/bin/menucard-backup
 echo '0 3 * * * root /usr/local/bin/menucard-backup' | sudo tee /etc/cron.d/menucard-backup
 ```
-Also copy `/var/backups/digital-menu` off the server occasionally (rsync/S3), a backup on the same disk won't survive losing the server.
+Copy `/var/backups/digital-menu` off the server occasionally (rsync/S3): a backup on the same disk won't survive losing the server.
+
+## MongoDB Atlas checklist
+1. **Network Access:** add this server's public IP (`curl -4 ifconfig.me`) under Security > Network Access. Without it the app stops at start with "Could not connect to MongoDB" (the log shows a TLS alert).
+2. **Database user** with read/write access to the `digitalmenu` database (or any database, if you set `MONGODB_DB`).
+3. First start creates the collections, indexes and the super admin.
+4. **Coming from the old SQLite version?** Copy the data once (ids, logins, photos kept; safe to run twice):
+```bash
+cd /opt/digital-menu && set -a && . /etc/digital-menu/env && set +a && node scripts/migrate-sqlite-to-mongo.js /var/lib/digital-menu/app.db
+```
 
 ## Troubleshooting
 | Symptom | Check |
 |---|---|
-| Service won't start | `journalctl -u digital-menu -n 50`, usually a missing env var (the app names it) |
+| Service won't start | `journalctl -u digital-menu -n 50`: a missing env var (the app names it), or "Could not connect to MongoDB" (Atlas Network Access, or a wrong `MONGODB_URI`) |
 | Caddy certificate error | DNS not pointing to the server yet, or ports 80/443 blocked (also check the provider's firewall panel) |
 | 502 from Caddy | `systemctl status digital-menu`; `curl localhost:3000/health` |
 | Login rate-limited / wrong IPs in logs | Keep `TRUST_PROXY` unset (default 1 hop, correct for Caddy) |

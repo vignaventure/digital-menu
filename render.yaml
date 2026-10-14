@@ -1,5 +1,5 @@
 # Render Blueprint: New + > Blueprint, point at this repo.
-# A persistent disk requires a paid instance type.
+# A persistent disk (for uploaded photos) requires a paid instance type. Data lives in MongoDB Atlas.
 services:
   - type: web
     name: digital-menu
@@ -17,6 +17,8 @@ services:
         value: /data
       - key: SESSION_SECRET
         generateValue: true
+      - key: MONGODB_URI
+        sync: false   # your Atlas connection string; allow Render's IPs (or 0.0.0.0/0) in Atlas Network Access
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

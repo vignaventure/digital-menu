@@ -4,9 +4,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
 const multer = require('multer');
-const { db } = require('./lib/db');
+const db = require('./lib/db');
 const { isProd, UPLOAD_DIR, SESSION_SECRET } = require('./lib/config');
-const { SqliteStore } = require('./lib/store');
+const { MongoStore } = require('./lib/store');
 const { HttpError } = require('./lib/service');
 
 const app = express();
@@ -31,8 +31,8 @@ app.use(helmet({
 app.use(compression());
 
 // Liveness/readiness probe for the host.
-app.get('/health', (req, res) => {
-  try { db.prepare('SELECT 1').get(); res.json({ status: 'ok' }); }
+app.get('/health', async (req, res) => {
+  try { await db.ping(); res.json({ status: 'ok' }); }
   catch { res.status(503).json({ status: 'error' }); }
 });
 
@@ -46,7 +46,7 @@ app.use('/api/docs/assets', express.static(path.dirname(require.resolve('swagger
 app.use(session({
   name: 'sid',
   secret: SESSION_SECRET,
-  store: new SqliteStore(db),
+  store: new MongoStore(() => db.cols.sessions),
   resave: false, saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'lax', secure: isProd ? 'auto' : false, maxAge: 1000 * 60 * 60 * 12 },
 }));
@@ -60,6 +60,7 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) { status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400; message = err.code === 'LIMIT_FILE_SIZE' ? 'Image too large (max 5MB)' : err.message; }
   else if (err.type === 'entity.parse.failed') { status = 400; message = 'Invalid JSON'; }
   else if (err.type === 'entity.too.large') { status = 413; message = 'That image is too large'; }
+  else if (db.isDuplicate(err)) { status = 409; message = 'That value is already in use'; }
   else if (!(err instanceof HttpError) && !(status < 500)) { console.error(err); message = 'Internal server error'; }
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
   res.status(status).send(status < 500 ? message : 'Something went wrong');

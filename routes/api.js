@@ -1,4 +1,5 @@
 // JSON API used by the dashboards (login cookie) and by external clients (bearer token).
+// Handlers are async (MongoDB); Express 5 sends any thrown error to the error handler in app.js.
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const QRCode = require('qrcode');
@@ -25,14 +26,14 @@ const sameOrigin = req => {
 
 // Accepts either "Authorization: Bearer <token>" (API clients) or the login cookie (the dashboards).
 // role: 'admin' | 'owner'
-const auth = role => (req, res, next) => {
+const auth = role => async (req, res, next) => {
   let u = null, viaCookie = false;
   const m = /^Bearer (.+)$/.exec(req.get('authorization') || '');
   if (m) {
     const p = verify(m[1], SESSION_SECRET);
-    u = p && svc.userIsActive(p.uid);
+    u = p && await svc.userIsActive(p.uid);
   } else if (req.session?.user) {
-    u = svc.userIsActive(req.session.user.id);
+    u = await svc.userIsActive(req.session.user.id);
     viaCookie = !!u;
   }
   if (!u) throw new HttpError(401, 'Missing, invalid or expired login');
@@ -51,8 +52,8 @@ const photo = req => req.file?.filename || (typeof req.body.image === 'string' &
 router.get('/openapi.json', (req, res) => res.json(require('../lib/openapi')));
 
 // ---- public ----
-router.get('/public/menu/:slug', (req, res) => {
-  const m = svc.getMenu(req.params.slug);
+router.get('/public/menu/:slug', async (req, res) => {
+  const m = await svc.getMenu(req.params.slug);
   if (!m) throw new HttpError(404, 'Menu not available');
   const r = m.restaurant;
   res.set('Cache-Control', 'public, max-age=30');
@@ -67,13 +68,13 @@ router.get('/public/menu/:slug', (req, res) => {
 
 // ---- auth ----
 // Token login for API clients. `identifier` = email or mobile number (`email` accepted as an alias).
-router.post('/auth/login', loginLimiter, (req, res) => {
-  const u = svc.authenticate(req.body.identifier ?? req.body.email, req.body.password);
+router.post('/auth/login', loginLimiter, async (req, res) => {
+  const u = await svc.authenticate(req.body.identifier ?? req.body.email, req.body.password);
   res.json({ token: sign({ uid: u.id }, SESSION_SECRET), expires_in: 12 * 3600, user: svc.publicUser(u) });
 });
 // Cookie login for the dashboards.
-router.post('/auth/session', loginLimiter, (req, res, next) => {
-  const u = svc.authenticate(req.body.identifier ?? req.body.email, req.body.password);
+router.post('/auth/session', loginLimiter, async (req, res, next) => {
+  const u = await svc.authenticate(req.body.identifier ?? req.body.email, req.body.password);
   req.session.regenerate(err => {
     if (err) return next(err);
     req.session.user = { id: u.id };
@@ -85,61 +86,61 @@ router.delete('/auth/session', (req, res) => {
   req.session ? req.session.destroy(done) : done();
 });
 router.get('/auth/me', auth(), (req, res) => res.json({ user: svc.publicUser(req.user) }));
-router.post('/auth/password', auth(), (req, res) => {
-  svc.changePassword(req.user.id, req.body.current_password, req.body.new_password);
+router.post('/auth/password', auth(), async (req, res) => {
+  await svc.changePassword(req.user.id, req.body.current_password, req.body.new_password);
   res.status(204).end();
 });
 
 // ---- super admin ----
 const admin = express.Router();
 admin.use(auth('admin'));
-admin.get('/summary', (req, res) => res.json(svc.summary()));
-admin.get('/restaurants', (req, res) => res.json({ restaurants: svc.listRestaurants().map(svc.restaurantOut) }));
-admin.post('/restaurants', (req, res) => res.status(201).json(svc.restaurantOut(svc.createRestaurant(req.body))));
-admin.get('/restaurants/:id', (req, res) => res.json(svc.restaurantOut(svc.getRestaurant(id(req)))));
-admin.patch('/restaurants/:id', (req, res) => res.json(svc.restaurantOut(svc.updateRestaurant(id(req), req.body))));
-admin.post('/restaurants/:id/password', (req, res) => { svc.resetOwnerPassword(id(req), req.body.password); res.status(204).end(); });
+admin.get('/summary', async (req, res) => res.json(await svc.summary()));
+admin.get('/restaurants', async (req, res) => res.json({ restaurants: (await svc.listRestaurants()).map(svc.restaurantOut) }));
+admin.post('/restaurants', async (req, res) => res.status(201).json(svc.restaurantOut(await svc.createRestaurant(req.body))));
+admin.get('/restaurants/:id', async (req, res) => res.json(svc.restaurantOut(await svc.getRestaurant(id(req)))));
+admin.patch('/restaurants/:id', async (req, res) => res.json(svc.restaurantOut(await svc.updateRestaurant(id(req), req.body))));
+admin.post('/restaurants/:id/password', async (req, res) => { await svc.resetOwnerPassword(id(req), req.body.password); res.status(204).end(); });
 // Generate a fresh password for the owner and return it (the only time it is returned unprompted).
-admin.post('/restaurants/:id/reset-password', (req, res) => {
-  const r = svc.getRestaurant(id(req));
+admin.post('/restaurants/:id/reset-password', async (req, res) => {
+  const r = await svc.getRestaurant(id(req));
   const password = svc.generatePassword();
-  svc.resetOwnerPassword(r.id, password);
+  await svc.resetOwnerPassword(r.id, password);
   res.json({ mobile: r.mobile, email: r.email, password });
 });
 // The password the admin set for this owner (stored encrypted); null if the owner changed it themselves.
-admin.post('/restaurants/:id/reveal-password', (req, res) => {
+admin.post('/restaurants/:id/reveal-password', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ password: svc.revealOwnerPassword(id(req)) });
+  res.json({ password: await svc.revealOwnerPassword(id(req)) });
 });
-admin.delete('/restaurants/:id', (req, res) => { svc.deleteRestaurant(id(req)); res.status(204).end(); });
+admin.delete('/restaurants/:id', async (req, res) => { await svc.deleteRestaurant(id(req)); res.status(204).end(); });
 router.use('/admin', admin);
 
 // ---- restaurant owner ----
 const owner = express.Router();
 owner.use(auth('owner'));
-owner.get('/restaurant', (req, res) => res.json(svc.restaurantOut(svc.getRestaurant(rid(req)))));
-owner.patch('/restaurant', (req, res) => res.json(svc.restaurantOut(svc.updateProfile(rid(req), req.body))));
+owner.get('/restaurant', async (req, res) => res.json(svc.restaurantOut(await svc.getRestaurant(rid(req)))));
+owner.patch('/restaurant', async (req, res) => res.json(svc.restaurantOut(await svc.updateProfile(rid(req), req.body))));
 
-owner.get('/categories', (req, res) => res.json({ categories: svc.listCategories(rid(req)) }));
-owner.post('/categories', (req, res) => res.status(201).json(svc.createCategory(rid(req), req.body.name)));
-owner.put('/categories/:id', (req, res) => res.json(svc.renameCategory(rid(req), id(req), req.body.name)));
-owner.delete('/categories/:id', (req, res) => { svc.deleteCategory(rid(req), id(req)); res.status(204).end(); });
+owner.get('/categories', async (req, res) => res.json({ categories: await svc.listCategories(rid(req)) }));
+owner.post('/categories', async (req, res) => res.status(201).json(await svc.createCategory(rid(req), req.body.name)));
+owner.put('/categories/:id', async (req, res) => res.json(await svc.renameCategory(rid(req), id(req), req.body.name)));
+owner.delete('/categories/:id', async (req, res) => { await svc.deleteCategory(rid(req), id(req)); res.status(204).end(); });
 
 // Items accept JSON (photo as a data URL) or multipart/form-data (field "image").
-owner.get('/items', (req, res) => res.json({ items: svc.listItems(rid(req), Number(req.query.category_id) || null).map(svc.itemOut) }));
-owner.post('/items', upload.single('image'), (req, res) =>
-  res.status(201).json(svc.itemOut(svc.saveItem(rid(req), req.body, photo(req)))));
-owner.get('/items/:id', (req, res) => res.json(svc.itemOut(svc.getItem(rid(req), id(req)))));
-owner.put('/items/:id', upload.single('image'), (req, res) =>
-  res.json(svc.itemOut(svc.saveItem(rid(req), { ...req.body, id: id(req) }, photo(req)))));
-owner.patch('/items/:id/availability', (req, res) => {
+owner.get('/items', async (req, res) => res.json({ items: (await svc.listItems(rid(req), Number(req.query.category_id) || null)).map(svc.itemOut) }));
+owner.post('/items', upload.single('image'), async (req, res) =>
+  res.status(201).json(svc.itemOut(await svc.saveItem(rid(req), req.body, photo(req)))));
+owner.get('/items/:id', async (req, res) => res.json(svc.itemOut(await svc.getItem(rid(req), id(req)))));
+owner.put('/items/:id', upload.single('image'), async (req, res) =>
+  res.json(svc.itemOut(await svc.saveItem(rid(req), { ...req.body, id: id(req) }, photo(req)))));
+owner.patch('/items/:id/availability', async (req, res) => {
   const a = req.body.available;
-  res.json(svc.itemOut(svc.setItemAvailable(rid(req), id(req), a === undefined ? undefined : (a === true || a === 'true' || a === 1 || a === '1'))));
+  res.json(svc.itemOut(await svc.setItemAvailable(rid(req), id(req), a === undefined ? undefined : (a === true || a === 'true' || a === 1 || a === '1'))));
 });
-owner.delete('/items/:id', (req, res) => { svc.deleteItem(rid(req), id(req)); res.status(204).end(); });
+owner.delete('/items/:id', async (req, res) => { await svc.deleteItem(rid(req), id(req)); res.status(204).end(); });
 
 owner.get('/qr.png', async (req, res) => {
-  const r = svc.getRestaurant(rid(req));
+  const r = await svc.getRestaurant(rid(req));
   res.type('png').set('Content-Disposition', req.query.download ? `attachment; filename="${r.slug}-menu-qr.png"` : 'inline');
   res.send(await QRCode.toBuffer(`${BASE_URL}/m/${r.slug}`, { width: Math.min(Math.max(Number(req.query.size) || 800, 128), 2048), margin: 2, errorCorrectionLevel: 'M' }));
 });

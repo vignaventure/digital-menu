@@ -11,6 +11,6 @@ router.get('/admin', (req, res) => res.sendFile(file('admin.html')));
 router.get('/api/docs', (req, res) => res.sendFile(file('api-docs.html')));
 router.get('/dashboard', (req, res) => res.sendFile(file('dashboard.html')));
 // The menu page loads its data from the API; a missing/inactive/expired menu gets a real 404 status.
-router.get('/m/:slug', (req, res) => res.status(svc.getMenu(req.params.slug) ? 200 : 404).sendFile(file('menu.html')));
+router.get('/m/:slug', async (req, res) => res.status(await svc.getMenu(req.params.slug) ? 200 : 404).sendFile(file('menu.html')));
 
 module.exports = router;

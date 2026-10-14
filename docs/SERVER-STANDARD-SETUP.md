@@ -20,7 +20,7 @@ Layout convention (one app = one name, e.g. `digital-menu`):
 
 ```bash
 sudo apt update && sudo apt -y upgrade
-sudo apt -y install git ufw curl sqlite3 debian-keyring debian-archive-keyring apt-transport-https
+sudo apt -y install git ufw curl debian-keyring debian-archive-keyring apt-transport-https
 sudo ufw allow OpenSSH && sudo ufw allow 80 && sudo ufw allow 443 && sudo ufw --force enable
 ```
 App ports are **never** opened in the firewall; only Caddy (80/443) is public.
@@ -126,23 +126,27 @@ Project name:        digital-menu (digital menu card + QR, SaaS for restaurants)
 Repo:                https://github.com/vignaventure/digital-menu
 Domain:              menu.vignadigital.com
 Local port:          3000
-Runtime / version:   Node >= 22.13 (use 24). Uses built-in node:sqlite, no native modules
+Runtime / version:   Node >= 22.13 (use 24). Database: MongoDB Atlas
 Build commands:      npm ci --omit=dev
 Start command:       /usr/bin/node server.js
 Health check path:   /health   (returns {"status":"ok"})
 Env variables:       NODE_ENV=production                 required
                      PORT=3000                           required
                      BASE_URL=https://menu.vignadigital.com   required; baked into QR codes
-                     DATA_DIR=/var/lib/digital-menu      required; db + uploads
+                     DATA_DIR=/var/lib/digital-menu      required; uploaded photos
+                     MONGODB_URI=mongodb+srv://...       required; Atlas connection string
+                     MONGODB_DB=digitalmenu              optional; database name
                      SESSION_SECRET                      required; openssl rand -hex 32
                      ADMIN_EMAIL, ADMIN_PASSWORD         required on FIRST start only (pw >= 8 chars)
                      TRUST_PROXY                         optional; leave unset behind Caddy
-Persistent data:     $DATA_DIR/app.db (+ -wal/-shm) and $DATA_DIR/uploads/ (restaurant images)
-First-run steps:     none; super admin is auto-created from ADMIN_* on first start
-Backup method:       sqlite3 app.db ".backup out.db" + tar of uploads/ (cron script in DEPLOY-UBUNTU.md)
+Persistent data:     MongoDB Atlas (all records) and $DATA_DIR/uploads/ (restaurant photos)
+First-run steps:     Atlas > Network Access: allow the server IP. Super admin is auto-created from ADMIN_* on first start.
+                     From the old SQLite version: node scripts/migrate-sqlite-to-mongo.js <app.db> (once)
+Backup method:       Atlas backups (M10+) or mongodump (free M0) + tar of uploads/ (see DEPLOY-UBUNTU.md)
 Gotchas:             - App refuses to start in production without SESSION_SECRET/BASE_URL
                      - Changing BASE_URL later invalidates every printed QR code
-                     - Single instance only (SQLite); never run two copies on one DATA_DIR
+                     - Photos are on local disk, so run a single instance
+                     - App won't start if Atlas does not allow the server's IP (Network Access)
                      - Caddy request body limit 8MB (uploads are capped at 5MB)
 ```
 Full copy-paste commands for this project: [DEPLOY-UBUNTU.md](DEPLOY-UBUNTU.md).

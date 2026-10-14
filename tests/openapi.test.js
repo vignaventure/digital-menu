@@ -10,12 +10,18 @@ process.env.LOGIN_RATE_LIMIT = '10000';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const app = require('../app');
 const spec = require('../lib/openapi');
+const { startMongo } = require('./helpers');
 
-let base, server;
-test.before(() => new Promise(r => { server = app.listen(0, () => { base = `http://localhost:${server.address().port}`; r(); }); }));
-test.after(() => { server.close(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
+let base, server, mongo, db;
+test.before(async () => {
+  mongo = await startMongo();
+  db = require('../lib/db');
+  const app = require('../app');
+  await db.init();
+  await new Promise(r => { server = app.listen(0, () => { base = `http://localhost:${server.address().port}`; r(); }); });
+});
+test.after(async () => { server.close(); await db.close(); await mongo.stop(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
 
 const call = async (method, url, { token, json } = {}) => {
   const res = await fetch(base + url, { method, headers: { ...(token && { authorization: `Bearer ${token}` }), ...(json && { 'content-type': 'application/json' }) }, body: json ? JSON.stringify(json) : undefined });
