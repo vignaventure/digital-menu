@@ -83,7 +83,9 @@ sudo apt update && sudo apt -y install caddy
 sudo tee /etc/caddy/Caddyfile >/dev/null <<'EOF'
 menu.vignadigital.com {
     encode gzip
-    request_body { max_size 8MB }
+    request_body {
+        max_size 8MB
+    }
     reverse_proxy localhost:3000
 }
 EOF
