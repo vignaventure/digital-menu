@@ -1,19 +1,26 @@
 {
-  "name": "menu-card",
+  "name": "digital-menu",
   "version": "1.0.0",
-  "description": "",
+  "description": "Digital menu card platform",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
   },
-  "keywords": [],
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
     "ejs": "^7.0.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
     "multer": "^2.4.0",
     "qrcode": "^1.5.4"
-  }
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "private": true
 }

@@ -15,6 +15,8 @@
   </form>
   <div class="panel table-scroll">
     <h3>Restaurants (<%= rows.length %>)</h3>
+    <% if (ok) { %><div class="err" style="background:#d3f9d8;color:#2b8a3e"><%= ok %></div><% } %>
+    <% if (error && rows.length) { %><div class="err"><%= error %></div><% } %>
     <table><tr><th>Name</th><th>Login</th><th>Paid</th><th>Until</th><th>Items</th><th>Status</th><th></th></tr>
     <% rows.forEach(r => { %>
       <tr>
@@ -25,6 +27,8 @@
           <form method="post" action="/admin/restaurants/<%= r.id %>/toggle"><button class="ghost"><%= r.active ? 'Disable' : 'Enable' %></button></form>
           <form method="post" action="/admin/restaurants/<%= r.id %>/password" class="row">
             <input name="password" placeholder="New password" minlength="6" style="width:130px"><button class="ghost">Reset</button></form>
+          <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
+                onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger">Delete</button></form>
         </div></td>
       </tr>
     <% }) %></table>

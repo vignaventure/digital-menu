@@ -1,0 +1,25 @@
+# Render Blueprint: New + > Blueprint, point at this repo.
+# A persistent disk requires a paid instance type.
+services:
+  - type: web
+    name: digital-menu
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # BASE_URL: set to your custom domain once attached (QR codes use it).
+      # Until then the app falls back to Render's RENDER_EXTERNAL_URL.

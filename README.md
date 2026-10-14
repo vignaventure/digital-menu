@@ -1,12 +1,41 @@
 # digital-menu
 
-Digital menu card SaaS: super admin onboards restaurants, owners manage menu items from a web dashboard, customers scan a QR code to view a mobile-friendly card grid menu.
+Digital menu card platform. A super admin onboards restaurants (paid), each restaurant gets a dashboard login to manage categories and items (image, name, description, price), and customers scan a QR code to see a mobile-friendly card-grid menu.
 
-## Run
-```
+| Who | Where |
+|---|---|
+| Super admin (you) | `/login` → `/admin` |
+| Restaurant owner | `/login` → `/dashboard` (menu, QR code, password) |
+| Customer (QR scan) | `/m/<slug>` |
+| API clients / mobile apps | `/api/v1` — see [docs/API.md](docs/API.md) |
+| Monitoring | `/health` |
+
+## Run locally
+```bash
 npm install
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=choose-one BASE_URL=https://your-domain npm start
+npm start          # http://localhost:3000, admin credentials printed on first run
+npm test
 ```
-Env: `PORT` (3000), `BASE_URL` (used in QR codes), `SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first run only).
 
-Routes: `/login`, `/admin` (onboarding), `/dashboard` (menu + QR), `/m/:slug` (public menu).
+## Deploy
+
+The app is one Node process + SQLite file + uploaded images, all stored under `DATA_DIR`. **That directory must be on a persistent volume**, otherwise data is lost on every deploy. Requires Node ≥ 22.13 (Docker image uses 24).
+
+**Required env in production** (the app refuses to start without them): `SESSION_SECRET` (≥32 chars, `openssl rand -hex 32`), `BASE_URL` (public https URL, **baked into QR codes — set it before printing any**), and on first run `ADMIN_EMAIL` + `ADMIN_PASSWORD` (≥8 chars). See [.env.example](.env.example).
+
+### Docker (any VPS)
+```bash
+cp .env.example .env   # fill it in
+docker compose up -d --build
+```
+Put a TLS-terminating proxy in front (Caddy: `menu.yourdomain.com { reverse_proxy localhost:3000 }`).
+
+### Render / Railway / Fly.io
+Deploy from this repo using the `Dockerfile`; attach a persistent disk/volume mounted at `/data`, set the env vars above and use `/health` as the health check. `render.yaml` is a ready Render blueprint.
+
+### Backups
+Back up `DATA_DIR` (`app.db` plus `uploads/`). With the app stopped, or using `sqlite3 app.db ".backup out.db"`, copy it somewhere safe on a schedule.
+
+## Notes
+- Single instance only (SQLite). Scale vertically; move to Postgres + object storage if you need multiple instances.
+- Disabling a restaurant or letting `plan_expires` pass hides its menu; disabling also locks the owner out immediately.
