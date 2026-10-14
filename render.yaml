@@ -21,5 +21,5 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      # BASE_URL: set to your custom domain once attached (QR codes use it).
+      # BASE_URL: set to https://menu.vignadigital.com once the domain is attached (QR codes use it).
       # Until then the app falls back to Render's RENDER_EXTERNAL_URL.

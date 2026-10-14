@@ -28,7 +28,7 @@ The app is one Node process + SQLite file + uploaded images, all stored under `D
 cp .env.example .env   # fill it in
 docker compose up -d --build
 ```
-Put a TLS-terminating proxy in front (Caddy: `menu.yourdomain.com { reverse_proxy localhost:3000 }`).
+Put a TLS-terminating proxy in front (Caddy: `menu.vignadigital.com { reverse_proxy localhost:3000 }`).
 
 ### Render / Railway / Fly.io
 Deploy from this repo using the `Dockerfile`; attach a persistent disk/volume mounted at `/data`, set the env vars above and use `/health` as the health check. `render.yaml` is a ready Render blueprint.
