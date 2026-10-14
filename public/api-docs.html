@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API docs · Digital Menu</title>
+<link rel="icon" href="/api/docs/assets/favicon-32x32.png">
+<link rel="stylesheet" href="/api/docs/assets/swagger-ui.css">
+<style>body{margin:0;background:#fafafa}.swagger-ui .topbar{display:none}</style>
+</head><body>
+<div id="swagger-ui"></div>
+<script src="/api/docs/assets/swagger-ui-bundle.js"></script>
+<script>
+// "Try it out" works straight away if you are logged in to the dashboard in this browser (cookie);
+// otherwise POST /auth/login and paste the token under Authorize.
+SwaggerUIBundle({ url: '/api/v1/openapi.json', dom_id: '#swagger-ui', deepLinking: true, persistAuthorization: true, displayRequestDuration: true, tryItOutEnabled: true });
+</script>
+</body></html>

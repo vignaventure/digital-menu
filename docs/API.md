@@ -2,6 +2,8 @@
 
 The dashboards in this app use this same API, so everything they can do is available to your own clients too.
 
+**Interactive docs: `/api/docs`** (read every endpoint, see example bodies, and try calls from the browser). The machine-readable description is at `/api/v1/openapi.json` (OpenAPI 3), which you can import into Postman, Insomnia or a code generator. The tables below are a quick reference.
+
 JSON in/out. Two ways to authenticate:
 
 - **Bearer token** for API clients: `POST /auth/login`, then send `Authorization: Bearer <token>` (valid 12h).

@@ -8,6 +8,7 @@ const file = name => path.join(__dirname, '..', 'public', name);
 router.get('/', (req, res) => res.render('landing', { contact: process.env.CONTACT_EMAIL || '' }));
 router.get('/login', (req, res) => res.sendFile(file('login.html')));
 router.get('/admin', (req, res) => res.sendFile(file('admin.html')));
+router.get('/api/docs', (req, res) => res.sendFile(file('api-docs.html')));
 router.get('/dashboard', (req, res) => res.sendFile(file('dashboard.html')));
 // The menu page loads its data from the API; a missing/inactive/expired menu gets a real 404 status.
 router.get('/m/:slug', (req, res) => res.status(svc.getMenu(req.params.slug) ? 200 : 404).sendFile(file('menu.html')));

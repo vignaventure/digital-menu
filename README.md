@@ -7,7 +7,7 @@ Digital menu card platform. A super admin onboards restaurants (paid), each rest
 | Super admin (you) | `/login` → `/admin` |
 | Restaurant owner | `/login` → `/dashboard` (menu, QR code, password) |
 | Customer (QR scan) | `/m/<slug>` |
-| API clients / mobile apps | `/api/v1` — see [docs/API.md](docs/API.md) |
+| API clients / mobile apps | `/api/v1`: interactive docs at `/api/docs`, OpenAPI at `/api/v1/openapi.json`, quick reference in [docs/API.md](docs/API.md) |
 | Monitoring | `/health` |
 
 ## Run locally

@@ -40,6 +40,9 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: isProd ? '1h' :
 // Upload names are random UUIDs, so they can be cached forever.
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
 
+// API docs viewer (Swagger UI), served from node_modules so no third-party CDN is needed
+app.use('/api/docs/assets', express.static(path.dirname(require.resolve('swagger-ui-dist/package.json')), { index: false, maxAge: isProd ? '7d' : 0 }));
+
 app.use(session({
   name: 'sid',
   secret: SESSION_SECRET,

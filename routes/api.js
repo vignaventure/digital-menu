@@ -47,6 +47,9 @@ const id = req => Number(req.params.id);
 // A photo is either a multipart upload (field "image") or a base64 data URL in the JSON body.
 const photo = req => req.file?.filename || (typeof req.body.image === 'string' && req.body.image.startsWith('data:') ? svc.saveImageData(req.body.image) : null);
 
+// ---- docs ----
+router.get('/openapi.json', (req, res) => res.json(require('../lib/openapi')));
+
 // ---- public ----
 router.get('/public/menu/:slug', (req, res) => {
   const m = svc.getMenu(req.params.slug);
