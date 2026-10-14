@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><title>Log in · Digital Menu</title></head>
+<body>
+<div class="auth">
+  <div class="panel">
+    <div class="brand" style="padding:0"><div class="mark" data-ico="menu"></div>Digital Menu</div>
+    <div><h2>Manage your menu from anywhere.</h2><p>Add dishes, update prices and share one QR code with your guests.</p></div>
+    <small style="color:var(--side-ink)">Restaurants are onboarded by our team. Your login is shared with you after onboarding.</small>
+  </div>
+  <div class="form"><div class="box">
+    <h1>Welcome back</h1><p class="muted">Log in to your dashboard.</p>
+    <form id="f">
+      <label for="identifier">Mobile number or email</label><input id="identifier" name="identifier" type="text" required autocomplete="username" autofocus placeholder="9876543210 or you@restaurant.com">
+      <label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password">
+      <div class="err" id="err" role="alert"></div>
+      <button class="lg" style="width:100%">Log in</button>
+    </form>
+    <p class="small muted" style="margin-top:18px"><a href="/">← Back to home</a></p>
+  </div></div>
+</div>
+<script src="/app.js"></script>
+<script>
+$('#f').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#err').textContent = '';
+  try { const { role } = await api('/api/v1/auth/session', 'POST', Object.fromEntries(new FormData(e.target))); location.href = role === 'admin' ? '/admin' : '/dashboard'; }
+  catch (er) { $('#err').textContent = er.message; }
+});
+</script>
+</body></html>

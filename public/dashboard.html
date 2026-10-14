@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css">
+<title>Dashboard · Digital Menu</title></head>
+<body>
+<div class="shell">
+<aside class="side">
+  <div class="brand"><div class="mark" data-ico="menu"></div><div><span id="brandName">Restaurant</span><small>Menu dashboard</small></div></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="items" data-ico="list" data-title="Menu items" data-sub="Add dishes with a photo, price and category"><span>Menu items</span></button>
+    <button data-tab="categories" data-ico="tag" data-sub="Group your dishes, for example Starters or Drinks"><span>Categories</span></button>
+    <button data-tab="qr" data-ico="qr" data-title="QR code" data-sub="Guests scan this to open your menu on their phone"><span>QR code</span></button>
+    <button data-tab="details" data-ico="store" data-title="Restaurant details" data-sub="Branding, business information and password"><span>Restaurant details</span></button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="logout" onclick="logout()" data-ico="logout"><span>Log out</span></button>
+</aside>
+<main class="main">
+  <div class="page-head"><h1 id="pageTitle"></h1><p id="pageSub"></p></div>
+
+  <!-- MENU ITEMS -->
+  <section data-panel="items">
+    <div class="stats" id="itemStats"></div>
+    <div class="toolbar">
+      <div class="filters">
+        <input type="search" id="iSearch" placeholder="Search items…" aria-label="Search items">
+        <select id="iCat" aria-label="Filter by category"><option value="">All categories</option></select>
+      </div>
+      <button id="addItem" data-ico="plus">Add item</button>
+    </div>
+    <div id="itemList" class="items"></div>
+  </section>
+
+  <!-- CATEGORIES -->
+  <section data-panel="categories">
+    <form id="catForm" class="card">
+      <h3>Add a category</h3>
+      <div class="actions"><input name="name" placeholder="e.g. Starters, Main Course, Drinks" maxlength="40" required style="flex:1;min-width:200px" aria-label="Category name"><button class="lg">Add category</button></div>
+      <div class="err" id="catErr" role="alert"></div>
+    </form>
+    <div class="card"><h3>Your categories</h3><div class="table-wrap" id="catList"></div></div>
+  </section>
+
+  <!-- QR -->
+  <section data-panel="qr">
+    <div class="grid2">
+      <div class="card"><div class="qr-box"><img id="qrImg" alt="QR code for your menu"></div></div>
+      <div class="card">
+        <h3>Your menu link</h3>
+        <div class="secret" id="menuUrl"></div>
+        <div class="actions" style="margin-top:12px"><button class="ghost" id="copyUrl">Copy link</button><a class="btn ghost" id="openMenu" target="_blank" rel="noopener">Open menu</a></div>
+        <h3 style="margin-top:24px">Get your QR code</h3>
+        <div class="actions"><a class="btn" id="dlQr">Download QR (PNG)</a><button class="ghost" id="dlPoster">Download table poster</button></div>
+        <div class="note">Print the poster and place it on tables. When you change your menu, the QR code stays the same.</div>
+        <p class="small muted" id="lanNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DETAILS -->
+  <section data-panel="details">
+    <div class="subtabs">
+      <button type="button" data-subtab="branding" class="on">Branding</button>
+      <button type="button" data-subtab="business">Business information</button>
+      <button type="button" data-subtab="password">Change password</button>
+    </div>
+    <form id="pf">
+      <div class="card" data-subpanel="branding">
+        <h3>Branding</h3><p class="small muted">Shown at the top of your customer menu.</p>
+        <div class="row">
+          <div><label>Logo</label>
+            <div class="img-pick"><div class="thumb" id="logoPrev"></div><div><input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp"><button type="button" class="ghost sm" id="logoRemove" style="margin-top:8px">Remove logo</button></div></div></div>
+          <div><label>Theme color</label><input type="color" name="theme_color"><label>Tagline</label><input name="tagline" maxlength="120" placeholder="Authentic family dining"></div>
+        </div>
+        <div class="err pfErr" role="alert"></div><div class="card-foot"><button class="lg">Save details</button></div>
+      </div>
+      <div class="card hidden" data-subpanel="business">
+        <h3>Business information</h3>
+        <div class="row">
+          <div><label>Restaurant name</label><input name="name" required></div><div><label>Owner</label><input name="owner"></div>
+          <div><label>Phone shown on your menu <span class="muted small">· optional</span></label><input name="contact_phone" type="tel" maxlength="20"></div><div><label>City</label><input name="city"></div>
+        </div>
+        <label>Address</label><textarea name="address"></textarea>
+        <div class="row">
+          <div><label>Login mobile</label><input id="mobileRO" disabled></div>
+          <div><label>Login email</label><input id="emailRO" disabled></div>
+        </div>
+        <p class="small muted">To change your login mobile or email, contact support.</p>
+        <div class="err pfErr" role="alert"></div><div class="card-foot"><button class="lg">Save details</button></div>
+      </div>
+    </form>
+    <form id="pwf" class="card hidden" data-subpanel="password" autocomplete="off">
+      <h3>Change password</h3><p class="small muted">Choose something only you know. Use at least 8 characters.</p>
+      <div class="row">
+        <div><label>Current password</label><input type="password" name="current_password" required autocomplete="current-password"></div>
+        <div><label>New password</label><input type="password" name="new_password" minlength="8" required autocomplete="new-password"></div>
+        <div><label>Confirm new password</label><input type="password" name="confirm_password" minlength="8" required autocomplete="new-password"></div>
+      </div>
+      <div class="err" id="pwErr" role="alert"></div><div class="card-foot"><button class="lg">Update password</button></div>
+    </form>
+  </section>
+</main>
+</div>
+<script src="/app.js"></script>
+<script>
+let profile, categories = [], items = [], logoData = null, logoRemoved = false;
+const thumbHtml = (img, name) => img ? `<img src="${esc(img)}" alt="" loading="lazy">` : esc((name || '?').trim().charAt(0).toUpperCase());
+
+// ---------- items ----------
+function renderItemStats() {
+  const on = items.filter((i) => i.available).length;
+  $('#itemStats').innerHTML = [['Total items', items.length, 'hl big'], ['Available', on], ['Hidden', items.length - on], ['Categories', categories.length]]
+    .map(([l, v, c]) => `<div class="stat ${c || ''}"><span>${l}</span><b>${v}</b></div>`).join('');
+}
+function renderItems() {
+  renderItemStats();
+  const q = $('#iSearch').value.trim().toLowerCase(), cat = $('#iCat').value;
+  const rows = items.filter((i) => (!cat || String(i.category_id) === cat) && (!q || i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)));
+  $('#itemList').innerHTML = rows.length ? rows.map((i) => `<div class="item ${i.available ? '' : 'off'}" style="--tc:${esc(profile.theme_color)}">
+    <div class="thumb">${thumbHtml(i.image, i.name)}</div>
+    <div class="item-body"><div class="nm">${esc(i.name)}</div><div><span class="pill">${esc(i.category)}</span> ${i.available ? '' : '<span class="pill warn">Hidden</span>'}</div>
+      <div class="ds">${esc(i.description)}</div><div class="price">${rupees(i.price)}</div>
+      <div class="item-foot"><button class="sm ghost" data-act="edit" data-id="${i.id}">Edit</button><button class="sm ghost" data-act="toggle" data-id="${i.id}">${i.available ? 'Hide' : 'Show'}</button><button class="sm danger" data-act="del" data-id="${i.id}">Delete</button></div></div></div>`).join('')
+    : `<div class="card empty" style="grid-column:1/-1">${items.length ? 'No items match your search.' : 'No items yet. Click “Add item” to create your first dish.'}</div>`;
+}
+function fillCategoryFilter() {
+  const cur = $('#iCat').value;
+  $('#iCat').innerHTML = '<option value="">All categories</option>' + categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  $('#iCat').value = cur;
+}
+async function loadAll() {
+  const [c, i] = await Promise.all([api('/api/v1/categories'), api('/api/v1/items')]);
+  categories = c.categories; items = i.items;
+  fillCategoryFilter(); renderItems(); renderCategories();
+}
+['input', 'change'].forEach((ev) => ['#iSearch', '#iCat'].forEach((id) => $(id).addEventListener(ev, renderItems)));
+
+function itemModal(item) {
+  if (!categories.length) { toast('Create a category first'); showTab('categories'); return; }
+  let image, removeImg = false;
+  const m = openModal({ title: item ? 'Edit item' : 'Add item', wide: true, html: `
+    <form id="itemForm">
+      <div class="img-pick"><div class="thumb" id="ipPrev" style="--tc:${esc(profile.theme_color)}">${thumbHtml(item?.image, item?.name || '?')}</div>
+        <div><input type="file" id="ipFile" accept="image/png,image/jpeg,image/webp"><button type="button" class="ghost sm" id="ipRemove" style="margin-top:8px">Remove image</button><div class="small muted" style="margin-top:6px">Photos are resized automatically.</div></div></div>
+      <label>Item name</label><input name="name" required maxlength="80" value="${esc(item?.name || '')}">
+      <div class="row">
+        <div><label>Price (₹)</label><input name="price" type="number" min="0" step="0.01" inputmode="decimal" required value="${item ? item.price : ''}"></div>
+        <div><label>Category</label><select name="category_id" required>${categories.map((c) => `<option value="${c.id}" ${item?.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+      </div>
+      <label>Description</label><textarea name="description" maxlength="300" placeholder="What is in it? Any note for guests?">${esc(item?.description || '')}</textarea>
+      <label class="check"><input type="checkbox" name="available" ${!item || item.available ? 'checked' : ''}> Show this item on the menu</label>
+      <div class="err" id="itemErr" role="alert"></div>
+      <div class="card-foot"><button type="button" class="ghost" data-close>Cancel</button><button id="itemSave">${item ? 'Save changes' : 'Add item'}</button></div>
+    </form>` });
+  const prev = $('#ipPrev', m);
+  $('#ipFile', m).addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { image = await resizeImage(f); removeImg = false; prev.innerHTML = `<img src="${image}" alt="">`; } catch (er) { $('#itemErr', m).textContent = er.message; }
+  });
+  $('#ipRemove', m).addEventListener('click', () => { image = undefined; removeImg = true; prev.textContent = ($('[name=name]', m).value || '?').trim().charAt(0).toUpperCase(); $('#ipFile', m).value = ''; });
+  $('#itemForm', m).addEventListener('submit', async (e) => {
+    e.preventDefault(); $('#itemErr', m).textContent = ''; $('#itemSave', m).disabled = true;
+    const f = e.target.elements;
+    const body = { name: f.name.value, price: f.price.value, category_id: f.category_id.value, description: f.description.value, available: f.available.checked, image, remove_image: removeImg };
+    try { await api(item ? `/api/v1/items/${item.id}` : '/api/v1/items', item ? 'PUT' : 'POST', body); closeModal(); toast(item ? 'Item saved' : 'Item added'); await loadAll(); }
+    catch (er) { $('#itemErr', m).textContent = er.message; $('#itemSave', m).disabled = false; }
+  });
+}
+$('#addItem').addEventListener('click', () => itemModal(null));
+$('#itemList').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const i = items.find((x) => x.id == b.dataset.id);
+  try {
+    if (b.dataset.act === 'edit') itemModal(i);
+    else if (b.dataset.act === 'toggle') { await api(`/api/v1/items/${i.id}/availability`, 'PATCH', { available: !i.available }); await loadAll(); toast(i.available ? 'Item hidden from menu' : 'Item is visible again'); }
+    else if (await confirmDialog({ title: 'Delete this item?', message: `"${i.name}" will be removed from your menu. This can't be undone.`, confirmText: 'Delete item', danger: true })) { await api(`/api/v1/items/${i.id}`, 'DELETE'); await loadAll(); toast('Item deleted'); }
+  } catch (er) { toast(er.message); }
+});
+
+// ---------- categories ----------
+function renderCategories() {
+  $('#catList').innerHTML = categories.length ? `<table><thead><tr><th>Category</th><th>Items</th><th>Action</th></tr></thead><tbody>${categories.map((c) => `<tr><td><b>${esc(c.name)}</b></td><td>${c.items}</td>
+    <td><div class="actions"><button class="sm ghost" data-cat-edit="${c.id}">Rename</button><button class="sm danger" data-cat-del="${c.id}">Delete</button></div></td></tr>`).join('')}</tbody></table>`
+    : '<p class="empty">No categories yet. Add your first one above.</p>';
+}
+$('#catForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#catErr').textContent = '';
+  try { await api('/api/v1/categories', 'POST', { name: e.target.elements.name.value }); e.target.reset(); await loadAll(); toast('Category added'); }
+  catch (er) { $('#catErr').textContent = er.message; }
+});
+$('#catList').addEventListener('click', async (e) => {
+  const ed = e.target.closest('[data-cat-edit]'), del = e.target.closest('[data-cat-del]');
+  if (ed) {
+    const c = categories.find((x) => x.id == ed.dataset.catEdit);
+    const m = openModal({ title: 'Rename category', html: `<form id="renForm"><label style="margin-top:0">Name</label><input name="name" value="${esc(c.name)}" maxlength="40" required><div class="err" id="renErr" role="alert"></div><div class="card-foot"><button type="button" class="ghost" data-close>Cancel</button><button>Save</button></div></form>` });
+    $('#renForm', m).addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      try { await api(`/api/v1/categories/${c.id}`, 'PUT', { name: ev.target.elements.name.value }); closeModal(); await loadAll(); toast('Category renamed'); } catch (er) { $('#renErr', m).textContent = er.message; }
+    });
+  } else if (del) {
+    const c = categories.find((x) => x.id == del.dataset.catDel);
+    if (await confirmDialog({ title: 'Delete this category?', message: `"${c.name}" will be removed.`, confirmText: 'Delete category', danger: true })) {
+      try { await api(`/api/v1/categories/${c.id}`, 'DELETE'); await loadAll(); toast('Category deleted'); } catch (er) { toast(er.message); }
+    }
+  }
+});
+
+// ---------- QR ----------
+function renderQr() {
+  $('#qrImg').src = `/api/v1/qr.png?size=640&v=${Date.now()}`;
+  $('#menuUrl').textContent = profile.menu_url; $('#openMenu').href = profile.menu_url;
+  $('#dlQr').href = '/api/v1/qr.png?size=1500&download=1'; $('#dlQr').setAttribute('download', '');
+  $('#lanNote').textContent = /localhost|127\.0\.0\.1/.test(profile.menu_url) ? 'Tip: this QR points to a local address, so phones cannot open it. Set BASE_URL to your real web address when you deploy.' : '';
+}
+$('#copyUrl').addEventListener('click', () => copyText(profile.menu_url));
+$('#dlPoster').addEventListener('click', async () => {
+  const W = 1200, H = 1600, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = profile.theme_color; g.fillRect(0, 0, W, H); g.fillStyle = '#fff'; g.beginPath(); g.roundRect(90, 330, W - 180, 1000, 48); g.fill();
+  const qr = new Image(); qr.src = '/api/v1/qr.png?size=900'; await new Promise((r) => { qr.onload = r; qr.onerror = r; });
+  g.drawImage(qr, 150, 400, 900, 900);
+  g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = '800 84px Inter, system-ui, sans-serif'; g.fillText(profile.name.length > 22 ? profile.name.slice(0, 21) + '…' : profile.name, W / 2, 200);
+  g.font = '500 42px Inter, system-ui, sans-serif'; g.globalAlpha = .9; g.fillText('Scan to view our menu', W / 2, 270); g.globalAlpha = 1;
+  g.font = '500 30px Inter, system-ui, sans-serif'; g.fillText(profile.menu_url.replace(/^https?:\/\//, ''), W / 2, 1440);
+  const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${profile.slug}-table-poster.png`; a.click();
+});
+
+// ---------- details ----------
+function fillProfile() {
+  $('#brandName').textContent = profile.name.length > 18 ? profile.name.slice(0, 17) + '…' : profile.name;
+  const f = $('#pf').elements; for (const k of ['name', 'owner', 'contact_phone', 'city', 'address', 'tagline', 'theme_color']) f[k].value = profile[k] || '';
+  $('#mobileRO').value = profile.owner_mobile || ''; $('#emailRO').value = profile.owner_email || ''; logoData = null; logoRemoved = false; showLogo(profile.logo);
+}
+function showLogo(src) { const p = $('#logoPrev'); p.style.setProperty('--tc', profile.theme_color); p.innerHTML = src ? `<img src="${esc(src)}" alt="" style="object-fit:contain;background:#fff">` : esc(profile.name.charAt(0).toUpperCase()); }
+$('#logoFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { logoData = await resizeImage(f, { max: 400, type: 'image/png' }); logoRemoved = false; showLogo(logoData); } catch (er) { toast(er.message); }
+});
+$('#logoRemove').addEventListener('click', () => { logoData = null; logoRemoved = true; $('#logoFile').value = ''; showLogo(null); });
+$('#pf').addEventListener('submit', async (e) => {
+  e.preventDefault(); document.querySelectorAll('.pfErr').forEach((x) => (x.textContent = ''));
+  try {
+    const body = { ...Object.fromEntries(new FormData(e.target)), logo: logoData || undefined, remove_logo: logoRemoved };
+    profile = await api('/api/v1/restaurant', 'PATCH', body); fillProfile(); toast('Details saved'); renderItems();
+  } catch (er) { document.querySelectorAll('.pfErr').forEach((x) => (x.textContent = er.message)); }
+});
+$('#pwf').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#pwErr').textContent = ''; const f = Object.fromEntries(new FormData(e.target));
+  if (f.new_password !== f.confirm_password) { $('#pwErr').textContent = 'New passwords do not match'; return; }
+  try { await api('/api/v1/auth/password', 'POST', f); e.target.reset(); toast('Password updated'); } catch (er) { $('#pwErr').textContent = er.message; }
+});
+
+let showTab;
+(async () => {
+  await requireRole('owner');
+  profile = await api('/api/v1/restaurant'); fillProfile(); renderQr();
+  subTabs(); await loadAll();
+  showTab = tabs($('#tabs'), (n) => { if (n === 'qr') renderQr(); });
+})();
+</script>
+</body></html>

@@ -16,6 +16,8 @@ npm install
 npm start          # http://localhost:3000, admin credentials printed on first run
 npm test
 ```
+In development the QR codes use your Wi-Fi address (so a phone on the same network can scan them). In production set `BASE_URL`.
+
 
 ## Deploy
 

@@ -1,5 +1,6 @@
-/* Landing page: reuses tokens from style.css (--brand, --bg, --ink, --mute, --line) */
-.lp{background:var(--bg)}
+/* Landing page. Pinned to its own light palette so it looks the same whatever the dashboard stylesheet does. */
+body.lp{color-scheme:light;--bg:#f6f5f2;--card:#fff;--raised:#fbfaf8;--ink:#1d1d1f;--mute:#6b6b70;--muted:#6b6b70;--line:#e6e4df;
+  --brand:#d9480f;--brand-600:#c2410c;--brand-ink:#fff;background:var(--bg);color:var(--ink)}
 .lp h1,.lp h2,.lp h3{letter-spacing:-.02em}
 .lp-wrap{max-width:1080px;margin:0 auto;padding:0 20px}
 .lp .btn{border-radius:10px;font-weight:600}
@@ -20,7 +21,7 @@
 .lp-hero-grid{display:grid;gap:40px;align-items:center}
 @media(min-width:880px){.lp-hero-grid{grid-template-columns:1.1fr .9fr}.lp-hero{padding:80px 0 88px}}
 .lp-eyebrow{color:var(--brand);font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.12em;margin:0 0 12px}
-.lp-hero h1{font-size:clamp(2.2rem,6.5vw,3.8rem);line-height:1.05;margin:0 0 18px}
+.lp-hero h1{font-size:clamp(2.2rem,6vw,3.4rem);line-height:1.05;margin:0 0 18px}
 .lp-hero h1 span{color:var(--brand)}
 .lp-lead{font-size:1.1rem;color:var(--mute);max-width:34em;margin:0 0 26px}
 .lp-cta{display:flex;gap:12px;flex-wrap:wrap}

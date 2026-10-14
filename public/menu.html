@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#d9480f" id="themeMeta">
+<title>Menu</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="menu-page">
+<div id="app"><p class="muted" style="text-align:center;padding:80px 16px">Loading menu…</p></div>
+<script src="/app.js"></script>
+<script>
+const slug = location.pathname.split('/').pop();
+let data;
+
+const thumb = (i) => i.image
+  ? `<div class="thumb"><img src="${esc(i.image)}" alt="${esc(i.name)}" loading="lazy" decoding="async"></div>`
+  : `<div class="thumb" aria-hidden="true">${esc(i.name.trim().charAt(0).toUpperCase())}</div>`;
+
+const card = (i) => `<button class="m-card" data-item="${i.id}" aria-label="${esc(i.name)}, ${rupees(i.price)}">
+  ${thumb(i)}<div class="b"><div class="nm">${esc(i.name)}</div>${i.description ? `<div class="ds">${esc(i.description)}</div>` : ''}<div class="pr">${rupees(i.price)}</div></div></button>`;
+
+function render(filter = '') {
+  const q = filter.trim().toLowerCase();
+  const cats = data.categories.map((c) => ({ ...c, items: c.items.filter((i) => !q || i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)) })).filter((c) => c.items.length);
+  $('#chips').innerHTML = cats.map((c, n) => `<button class="chip ${n === 0 ? 'on' : ''}" data-cat="${c.id}">${esc(c.name)}</button>`).join('');
+  $('#sections').innerHTML = cats.length ? cats.map((c) => `<section class="m-sec" id="cat-${c.id}" data-cat="${c.id}"><h2>${esc(c.name)} <span>${c.items.length} item${c.items.length > 1 ? 's' : ''}</span></h2><div class="m-grid">${c.items.map(card).join('')}</div></section>`).join('')
+    : `<p class="muted" style="text-align:center;padding:48px 0">${q ? 'No dishes match your search.' : 'The menu is being updated. Please check back soon.'}</p>`;
+  observe();
+}
+
+let io, lockUntil = 0; // after a chip tap, don't let scroll-spy override it while the page scrolls
+function observe() {
+  io?.disconnect();
+  io = new IntersectionObserver((entries) => {
+    const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (vis && Date.now() > lockUntil) setActive(vis.target.dataset.cat, false);
+  }, { rootMargin: '-120px 0px -65% 0px' });
+  document.querySelectorAll('.m-sec').forEach((s) => io.observe(s));
+}
+function setActive(id, scroll = true) {
+  document.querySelectorAll('.chip').forEach((c) => {
+    const on = c.dataset.cat === String(id); c.classList.toggle('on', on);
+    if (on) c.scrollIntoView({ inline: 'center', block: 'nearest', behavior: scroll ? 'smooth' : 'auto' });
+  });
+}
+
+function openItem(id) {
+  const i = data.categories.flatMap((c) => c.items).find((x) => x.id === id); if (!i) return;
+  const el = document.createElement('div'); el.className = 'sheet'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  el.innerHTML = `<div class="sheet-wrap"><button class="sheet-close" aria-label="Close">✕</button><div class="sheet-box">${thumb(i)}<div class="sheet-body"><h2>${esc(i.name)}</h2><div class="pr">${rupees(i.price)}</div>${i.description ? `<p>${esc(i.description)}</p>` : ''}</div></div></div>`;
+  const close = () => { el.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('.sheet-close')) close(); });
+  document.addEventListener('keydown', onKey); document.body.appendChild(el); document.body.style.overflow = 'hidden';
+}
+
+(async function init() {
+  try { data = await api('/api/v1/public/menu/' + encodeURIComponent(slug)); }
+  catch { $('#app').innerHTML = '<div style="text-align:center;padding:96px 20px"><h2>Menu not found</h2><p class="muted">This menu link is not available.</p></div>'; return; }
+  const r = data.restaurant;
+  document.title = `${r.name} · Menu`;
+  document.documentElement.style.setProperty('--theme', r.theme_color); document.body.style.setProperty('--theme', r.theme_color);
+  $('#themeMeta').content = r.theme_color;
+  $('#app').innerHTML = `
+    <header class="m-hero">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<h1>${esc(r.name)}</h1>${r.tagline ? `<p>${esc(r.tagline)}</p>` : ''}${r.city ? `<div class="small">${esc(r.city)}</div>` : ''}</header>
+    <div class="m-bar"><div class="m-search"><input type="search" id="q" placeholder="Search dishes" aria-label="Search dishes" autocomplete="off"></div><div class="m-chips" id="chips" role="tablist"></div></div>
+    <main class="m-wrap" id="sections"></main>
+    <footer class="m-foot">${r.address ? esc(r.address) + '<br>' : ''}${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : ''}</footer>`;
+  render();
+  addEventListener('scroll', () => { // at the very bottom of a short menu, highlight the last category
+    if (Date.now() > lockUntil && innerHeight + scrollY >= document.documentElement.scrollHeight - 4) { const last = [...document.querySelectorAll('.m-sec')].pop(); if (last) setActive(last.dataset.cat, false); }
+  }, { passive: true });
+  $('#q').addEventListener('input', (e) => render(e.target.value));
+  $('#chips').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    lockUntil = Date.now() + 1000; setActive(c.dataset.cat); document.getElementById('cat-' + c.dataset.cat)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('#sections').addEventListener('click', (e) => { const c = e.target.closest('.m-card'); if (c) openItem(Number(c.dataset.item)); });
+})();
+</script>
+</body></html>

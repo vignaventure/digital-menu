@@ -10,56 +10,137 @@ process.env.LOGIN_RATE_LIMIT = '10000'; // tests log in far more often than the 
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { DatabaseSync } = require('node:sqlite');
 const app = require('../app');
 
 let base, server;
 test.before(() => new Promise(r => { server = app.listen(0, () => { base = `http://localhost:${server.address().port}`; r(); }); }));
 test.after(() => { server.close(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
 
-const call = async (method, url, { token, json, form } = {}) => {
-  const headers = {};
-  if (token) headers.authorization = `Bearer ${token}`;
-  if (json) headers['content-type'] = 'application/json';
-  const res = await fetch(base + url, { method, headers, body: json ? JSON.stringify(json) : form });
+// token = bearer auth, cookie = dashboard login cookie
+const call = async (method, url, { token, cookie, json, form, headers = {} } = {}) => {
+  const h = { ...headers };
+  if (token) h.authorization = `Bearer ${token}`;
+  if (cookie) h.cookie = cookie;
+  if (json) h['content-type'] = 'application/json';
+  const res = await fetch(base + url, { method, headers: h, redirect: 'manual', body: json ? JSON.stringify(json) : form });
   const type = res.headers.get('content-type') || '';
-  return { status: res.status, body: type.includes('json') ? await res.json() : Buffer.from(await res.arrayBuffer()), type };
+  return { status: res.status, headers: res.headers, type, body: type.includes('json') ? await res.json() : Buffer.from(await res.arrayBuffer()) };
 };
-const login = async (email, password) => (await call('POST', '/api/v1/auth/login', { json: { email, password } })).body.token;
+const login = async (identifier, password) => (await call('POST', '/api/v1/auth/login', { json: { identifier, password } })).body.token;
+const sessionLogin = async (identifier, password) => {
+  const r = await call('POST', '/api/v1/auth/session', { json: { identifier, password } });
+  return { ...r, cookie: r.headers.get('set-cookie')?.split(';')[0] };
+};
 
-// 1x1 transparent GIF
 const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const PNG_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const uploadsDir = () => path.join(process.env.DATA_DIR, 'uploads');
+const settle = () => new Promise(r => setTimeout(r, 100)); // file deletes are fire-and-forget
 
-test('landing page is served at /', async () => {
-  const r = await fetch(base + '/');
-  assert.equal(r.status, 200);
-  assert.match(await r.text(), /one <span>scan<\/span> away/);
+test('pages are served', async () => {
+  const home = await call('GET', '/');
+  assert.equal(home.status, 200);
+  assert.match(home.body.toString(), /one <span>scan<\/span> away/);
+  for (const p of ['/login', '/admin', '/dashboard']) {
+    const r = await call('GET', p);
+    assert.equal(r.status, 200, p);
+    assert.match(r.type, /text\/html/);
+  }
+  assert.equal((await call('GET', '/m/does-not-exist')).status, 404);
+  assert.equal((await call('GET', '/style.css')).status, 200);
+  assert.equal((await call('GET', '/fonts/inter-latin.woff2')).status, 200);
+  const h = await call('GET', '/health');
+  assert.equal(h.status, 200);
+  assert.equal(h.body.status, 'ok');
 });
 
-test('health check', async () => {
-  const r = await call('GET', '/health');
-  assert.equal(r.status, 200);
-  assert.equal(r.body.status, 'ok');
+test('cookie login, token login, logout and the cross-site check', async () => {
+  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: 'admin@test.com', password: 'wrong' } })).status, 401);
+  assert.equal((await call('GET', '/api/v1/admin/summary')).status, 401);
+
+  const s = await sessionLogin('admin@test.com', 'AdminPass123');
+  assert.equal(s.status, 200);
+  assert.equal(s.body.role, 'admin');
+  assert.match(s.headers.get('set-cookie'), /HttpOnly/i);
+  assert.equal((await call('GET', '/api/v1/auth/me', { cookie: s.cookie })).body.user.role, 'admin');
+  assert.equal((await call('GET', '/api/v1/admin/summary', { cookie: s.cookie })).status, 200);
+
+  // a write coming from another site is refused even with a valid cookie
+  const evil = await call('POST', '/api/v1/admin/restaurants', { cookie: s.cookie, headers: { origin: 'http://evil.example' }, json: { name: 'X', mobile: '9000000000' } });
+  assert.equal(evil.status, 403);
+  // ...while the same origin is fine
+  const same = await call('PATCH', '/api/v1/admin/restaurants/999', { cookie: s.cookie, headers: { origin: base }, json: { name: 'x' } });
+  assert.equal(same.status, 404);
+
+  // logout kills the session
+  assert.equal((await call('DELETE', '/api/v1/auth/session', { cookie: s.cookie })).status, 204);
+  assert.equal((await call('GET', '/api/v1/auth/me', { cookie: s.cookie })).status, 401);
 });
 
-test('full flow: onboard → manage menu → public menu → QR', async () => {
-  // auth
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { email: 'admin@test.com', password: 'wrong' } })).status, 401);
-  assert.equal((await call('GET', '/api/v1/admin/restaurants')).status, 401);
+test('onboarding: validation, generated password, summary, login by mobile or email', async () => {
   const admin = await login('admin@test.com', 'AdminPass123');
+  const post = json => call('POST', '/api/v1/admin/restaurants', { token: admin, json });
 
-  // onboard
-  const created = await call('POST', '/api/v1/admin/restaurants', {
-    token: admin, json: { name: 'Spice Villa', mobile: '+91 98765-43210', email: 'Owner@Spice.com', password: 'secret12', price_paid: 999, plan_type: 'limited', plan_expires: '2099-01-01' },
-  });
-  assert.equal(created.status, 201);
-  assert.equal(created.body.slug, 'spice-villa');
-  assert.equal(created.body.menu_url, 'http://test.local/m/spice-villa');
-  assert.equal((await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'X', mobile: '9000000009', email: 'owner@spice.com', password: 'secret12' } })).status, 409);
-  assert.equal((await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'X', mobile: '+919876543210', password: 'secret12' } })).status, 409); // same mobile, different formatting
-  assert.equal((await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'X', email: 'bad', password: '1' } })).status, 400);
+  assert.equal((await post({ name: 'No Mobile', email: 'a@b.com' })).status, 400);
+  assert.equal((await post({ name: 'Bad Mobile', mobile: '12ab' })).status, 400);
+  assert.equal((await post({ name: 'Short Pw', mobile: '9000000020', password: '1' })).status, 400);
+  assert.equal((await post({ name: 'Bad Plan', mobile: '9000000021', plan_type: 'limited' })).status, 400);
+  assert.equal((await post({ name: 'Bad Plan', mobile: '9000000021', plan_type: 'weekly' })).status, 400);
 
-  // owner can't use admin API; admin can't use owner API
-  const owner = await login('owner@spice.com', 'secret12');
+  // blank password => generated and returned once; owner/city/paid stored
+  const a = await post({ name: 'Spice Garden', owner: 'Ravi', city: 'Chennai', mobile: '+91 98765-43210', email: 'Ravi@Spice.com', price_paid: 4999, paid: true });
+  assert.equal(a.status, 201);
+  assert.equal(a.body.slug, 'spice-garden');
+  assert.equal(a.body.owner_mobile, '+919876543210');
+  assert.equal(a.body.owner_email, 'ravi@spice.com');
+  assert.equal(a.body.owner, 'Ravi');
+  assert.equal(a.body.paid, true);
+  assert.equal(a.body.plan_type, 'one_time');
+  assert.ok(a.body.generated_password.length >= 10);
+  assert.ok(await login('+919876543210', a.body.generated_password));       // by mobile
+  assert.ok(await login('+91 98765 43210', a.body.generated_password));                      // formatting ignored
+  assert.ok(await login('RAVI@spice.com', a.body.generated_password));                        // by email
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${a.body.id}`, { token: admin })).body.generated_password, undefined);
+
+  // email optional; limited plan with a date; unpaid
+  const b = await post({ name: 'Green Bowl', mobile: '9000000002', password: 'secret12', price_paid: 2999, plan_type: 'limited', plan_expires: '2099-12-31' });
+  assert.equal(b.status, 201);
+  assert.equal(b.body.owner_email, null);
+  assert.equal(b.body.plan_type, 'limited');
+  assert.equal(b.body.paid, false);
+  assert.equal(b.body.generated_password, undefined);
+
+  // duplicates
+  assert.equal((await post({ name: 'Dup', mobile: '9000000002' })).status, 409);
+  assert.equal((await post({ name: 'Dup', mobile: '9000000099', email: 'ravi@spice.com' })).status, 409);
+
+  // numbers for the admin dashboard: revenue counts only payments received
+  const sum = (await call('GET', '/api/v1/admin/summary', { token: admin })).body;
+  assert.deepEqual({ r: sum.restaurants, a: sum.active, i: sum.inactive, rev: sum.revenue, out: sum.outstanding }, { r: 2, a: 2, i: 0, rev: 4999, out: 2999 });
+
+  // edit: rename, move mobile/email, flip payment + plan
+  const upd = await call('PATCH', `/api/v1/admin/restaurants/${b.body.id}`, { token: admin, json: { name: 'Green Bowl Cafe', owner: 'Anita', city: 'Pune', mobile: '9000000012', email: 'gb@x.com', paid: true, plan_type: 'one_time' } });
+  assert.equal(upd.status, 200);
+  assert.deepEqual([upd.body.name, upd.body.owner, upd.body.city, upd.body.paid, upd.body.plan_expires, upd.body.owner_mobile], ['Green Bowl Cafe', 'Anita', 'Pune', true, null, '9000000012']);
+  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000002', password: 'secret12' } })).status, 401); // old mobile dead
+  assert.ok(await login('gb@x.com', 'secret12'));
+  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${b.body.id}`, { token: admin, json: { mobile: '+919876543210' } })).status, 409);
+  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${b.body.id}`, { token: admin, json: { plan_type: 'limited' } })).status, 400);
+  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${b.body.id}`, { token: admin, json: { mobile: 'abc' } })).status, 400);
+  const sum2 = (await call('GET', '/api/v1/admin/summary', { token: admin })).body;
+  assert.equal(sum2.revenue, 7998);
+  assert.equal(sum2.outstanding, 0);
+});
+
+test('owner menu: categories, items with photos, availability, profile, public menu', async () => {
+  const admin = await login('admin@test.com', 'AdminPass123');
+  const r = (await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Menu Test Cafe', mobile: '9111100001', password: 'secret12' } })).body;
+  const owner = await login('9111100001', 'secret12');
+  const other = await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Other Cafe', mobile: '9111100002', password: 'secret12' } });
+  const owner2 = await login('9111100002', 'secret12');
+
+  // role separation
   assert.equal((await call('GET', '/api/v1/admin/restaurants', { token: owner })).status, 403);
   assert.equal((await call('GET', '/api/v1/categories', { token: admin })).status, 403);
 
@@ -67,219 +148,152 @@ test('full flow: onboard → manage menu → public menu → QR', async () => {
   const cat = (await call('POST', '/api/v1/categories', { token: owner, json: { name: 'Starters' } })).body;
   assert.ok(cat.id);
   assert.equal((await call('PUT', `/api/v1/categories/${cat.id}`, { token: owner, json: { name: 'Starters & Snacks' } })).status, 200);
+  assert.equal((await call('POST', '/api/v1/categories', { token: owner, json: { name: '  ' } })).status, 400);
 
-  // item with image (multipart)
-  const form = new FormData();
-  form.set('name', 'Paneer Tikka'); form.set('description', 'Smoky'); form.set('price', '199.5'); form.set('category_id', String(cat.id));
-  form.set('image', new Blob([GIF], { type: 'image/gif' }), 'a.gif');
-  const item = await call('POST', '/api/v1/items', { token: owner, form });
-  assert.equal(item.status, 201);
-  assert.match(item.body.image_url, /^http:\/\/test\.local\/uploads\/.+\.gif$/);
-  const file = path.join(process.env.DATA_DIR, 'uploads', path.basename(item.body.image_url));
-  assert.ok(fs.existsSync(file));
+  // item with a photo sent as a data URL (what the dashboard does)
+  const made = await call('POST', '/api/v1/items', { token: owner, json: { name: 'Paneer Tikka', description: 'Smoky', price: '199.5', category_id: cat.id, available: true, image: PNG_URL } });
+  assert.equal(made.status, 201);
+  assert.match(made.body.image, /^\/uploads\/.+\.png$/);
+  assert.match(made.body.image_url, /^http:\/\/test\.local\/uploads\/.+\.png$/);
+  assert.equal(made.body.price, 199.5);
+  const file1 = path.join(uploadsDir(), path.basename(made.body.image));
+  assert.ok(fs.existsSync(file1));
+  assert.equal((await call('GET', made.body.image)).status, 200);
 
-  // validation
+  // bad image / bad data
+  assert.equal((await call('POST', '/api/v1/items', { token: owner, json: { name: 'Bad', price: 5, category_id: cat.id, image: 'data:text/html;base64,PGI+' } })).status, 400);
   assert.equal((await call('POST', '/api/v1/items', { token: owner, json: { name: 'Bad', price: -1, category_id: cat.id } })).status, 400);
-  assert.equal((await call('POST', '/api/v1/items', { token: owner, json: { name: 'Bad', price: 5, category_id: 9999 } })).status, 400);
+  assert.equal((await call('POST', '/api/v1/items', { token: owner, json: { name: 'Bad', price: 5, category_id: 99999 } })).status, 400);
+  assert.equal((await call('POST', '/api/v1/items', { token: owner, json: { name: '', price: 5, category_id: cat.id } })).status, 400);
 
-  // image is served
-  assert.equal((await call('GET', new URL(item.body.image_url).pathname)).status, 200);
+  // multipart upload still works, and replacing a photo deletes the old file
+  const form = new FormData();
+  form.set('name', 'Spring Rolls'); form.set('price', '149'); form.set('category_id', String(cat.id));
+  form.set('image', new Blob([GIF], { type: 'image/gif' }), 'a.gif');
+  const rolls = await call('POST', '/api/v1/items', { token: owner, form });
+  assert.equal(rolls.status, 201);
+  const replaced = await call('PUT', `/api/v1/items/${made.body.id}`, { token: owner, json: { name: 'Paneer Tikka', price: 210, category_id: cat.id, image: PNG_URL } });
+  assert.equal(replaced.body.price, 210);
+  await settle();
+  assert.ok(!fs.existsSync(file1));                                  // old photo gone
+  assert.ok(fs.existsSync(path.join(uploadsDir(), path.basename(replaced.body.image))));
 
-  // public menu shows it; hiding removes it
-  let menu = await call('GET', '/api/v1/public/menu/spice-villa');
-  assert.equal(menu.body.categories[0].items[0].name, 'Paneer Tikka');
-  assert.equal((await call('GET', '/m/spice-villa')).status, 200);
-  await call('PATCH', `/api/v1/items/${item.body.id}/availability`, { token: owner, json: { available: false } });
-  assert.equal((await call('GET', '/api/v1/public/menu/spice-villa')).body.categories.length, 0);
+  // remove_image clears the photo; omitting image keeps it
+  const keep = await call('PUT', `/api/v1/items/${rolls.body.id}`, { token: owner, json: { name: 'Spring Rolls', price: 149, category_id: cat.id } });
+  assert.ok(keep.body.image);
+  const rm = await call('PUT', `/api/v1/items/${rolls.body.id}`, { token: owner, json: { name: 'Spring Rolls', price: 149, category_id: cat.id, remove_image: true } });
+  assert.equal(rm.body.image, null);
 
-  // tenant isolation: another restaurant can't touch this item
-  await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Other Cafe', mobile: '9000000002', email: 'o2@cafe.com', password: 'secret12' } });
-  const owner2 = await login('o2@cafe.com', 'secret12');
-  assert.equal((await call('DELETE', `/api/v1/items/${item.body.id}`, { token: owner2 })).status, 404);
+  // hidden items disappear from the public menu; the category now reports its item count
+  assert.equal((await call('GET', '/api/v1/categories', { token: owner })).body.categories[0].items, 2);
+  await call('PATCH', `/api/v1/items/${rolls.body.id}/availability`, { token: owner, json: { available: false } });
+  const pub = (await call('GET', `/api/v1/public/menu/${r.slug}`)).body;
+  assert.deepEqual(pub.categories[0].items.map(i => i.name), ['Paneer Tikka']);
+  assert.equal((await call('GET', `/m/${r.slug}`)).status, 200);
 
-  // QR
-  const qr = await call('GET', '/api/v1/qr.png', { token: owner });
+  // tenant isolation
+  assert.equal((await call('DELETE', `/api/v1/items/${made.body.id}`, { token: owner2 })).status, 404);
+  assert.equal((await call('PUT', `/api/v1/items/${made.body.id}`, { token: owner2, json: { name: 'x', price: 1, category_id: cat.id } })).status, 400);
+  assert.equal((await call('DELETE', `/api/v1/categories/${cat.id}`, { token: owner2 })).status, 404);
+
+  // a category that still has items can't be deleted; an empty one can
+  assert.equal((await call('DELETE', `/api/v1/categories/${cat.id}`, { token: owner })).status, 409);
+  const empty = (await call('POST', '/api/v1/categories', { token: owner, json: { name: 'Empty' } })).body;
+  assert.equal((await call('DELETE', `/api/v1/categories/${empty.id}`, { token: owner })).status, 204);
+
+  // profile + branding, with a logo sent as a data URL
+  assert.equal((await call('PATCH', '/api/v1/restaurant', { token: owner, json: { name: 'Menu Test Cafe', theme_color: 'red' } })).status, 400);
+  const prof = await call('PATCH', '/api/v1/restaurant', { token: owner, json: { name: 'Menu Test Cafe', owner: 'Sam', city: 'Goa', address: '1 Beach Rd', tagline: 'Fresh daily', theme_color: '#0f766e', contact_phone: '9000011111', logo: PNG_URL } });
+  assert.equal(prof.status, 200);
+  assert.deepEqual([prof.body.tagline, prof.body.theme_color, prof.body.city, prof.body.contact_phone], ['Fresh daily', '#0f766e', 'Goa', '9000011111']);
+  assert.match(prof.body.logo, /^\/uploads\//);
+  const logoFile = path.join(uploadsDir(), path.basename(prof.body.logo));
+  const pub2 = (await call('GET', `/api/v1/public/menu/${r.slug}`)).body.restaurant;
+  assert.deepEqual([pub2.tagline, pub2.theme_color, pub2.phone, pub2.logo], ['Fresh daily', '#0f766e', '9000011111', prof.body.logo]);
+  const noLogo = await call('PATCH', '/api/v1/restaurant', { token: owner, json: { name: 'Menu Test Cafe', remove_logo: true } });
+  assert.equal(noLogo.body.logo, null);
+  await settle();
+  assert.ok(!fs.existsSync(logoFile));
+
+  // QR code
+  const qr = await call('GET', '/api/v1/qr.png?size=300', { token: owner });
   assert.equal(qr.status, 200);
   assert.equal(qr.type, 'image/png');
 
-  // password change
-  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner, json: { current_password: 'nope', new_password: 'newsecret1' } })).status, 400);
-  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner, json: { current_password: 'secret12', new_password: 'newsecret1' } })).status, 204);
-  await login('owner@spice.com', 'newsecret1');
-
-  // delete item removes the file
-  assert.equal((await call('DELETE', `/api/v1/items/${item.body.id}`, { token: owner })).status, 204);
-  await new Promise(r => setTimeout(r, 100));
-  assert.ok(!fs.existsSync(file));
-
-  // disabling a restaurant locks out the owner immediately and hides the menu
-  await call('POST', '/api/v1/categories', { token: owner, json: { name: 'Mains' } });
-  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${created.body.id}`, { token: admin, json: { active: false } })).status, 200);
-  assert.equal((await call('GET', '/api/v1/categories', { token: owner })).status, 401);
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { email: 'owner@spice.com', password: 'newsecret1' } })).status, 403);
-  assert.equal((await call('GET', '/api/v1/public/menu/spice-villa')).status, 404);
-  assert.equal((await call('GET', '/m/spice-villa')).status, 404);
-
-  // expired plan hides the menu
-  await call('PATCH', `/api/v1/admin/restaurants/${created.body.id}`, { token: admin, json: { active: true, plan_expires: '2000-01-01' } });
-  assert.equal((await call('GET', '/api/v1/public/menu/spice-villa')).status, 404);
-
-  // delete restaurant
-  assert.equal((await call('DELETE', `/api/v1/admin/restaurants/${created.body.id}`, { token: admin })).status, 204);
-  assert.equal((await call('GET', `/api/v1/admin/restaurants/${created.body.id}`, { token: admin })).status, 404);
+  // deleting an item or the whole restaurant removes the photo files
+  const photoFile = path.join(uploadsDir(), path.basename(replaced.body.image));
+  assert.equal((await call('DELETE', `/api/v1/items/${made.body.id}`, { token: owner })).status, 204);
+  await settle();
+  assert.ok(!fs.existsSync(photoFile));
+  assert.equal((await call('DELETE', `/api/v1/admin/restaurants/${other.body.id}`, { token: admin })).status, 204);
+  assert.equal((await call('GET', '/api/v1/categories', { token: owner2 })).status, 401);   // owner of a deleted restaurant is gone
 });
 
-test('owner/mobile rules, login by email or mobile, plan types, edit, generated password', async () => {
+test('active/inactive and plan expiry hide the menu and lock the owner out', async () => {
   const admin = await login('admin@test.com', 'AdminPass123');
-  const post = json => call('POST', '/api/v1/admin/restaurants', { token: admin, json });
-
-  // mobile mandatory, email optional
-  assert.equal((await post({ name: 'No Mobile', email: 'a@b.com', password: 'secret12' })).status, 400);
-  assert.equal((await post({ name: 'Bad Mobile', mobile: '12ab', password: 'secret12' })).status, 400);
-  const noEmail = await post({ name: 'Mobile Only', mobile: '(900) 000-0011', password: 'secret12' });
-  assert.equal(noEmail.status, 201);
-  assert.equal(noEmail.body.owner_mobile, '9000000011');
-  assert.equal(noEmail.body.owner_email, null);
-  assert.equal(noEmail.body.plan_type, 'one_time');
-  assert.equal(noEmail.body.plan_expires, null);
-
-  // login accepts mobile (any formatting) or email
-  assert.ok(await login('9000000011', 'secret12'));
-  assert.ok(await login('900 000 0011', 'secret12'));
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000011', password: 'nope' } })).status, 401);
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9999999999', password: 'secret12' } })).status, 401);
-
-  // limited plan needs a date; one_time clears it
-  assert.equal((await post({ name: 'Lim', mobile: '9000000012', password: 'secret12', plan_type: 'limited' })).status, 400);
-  assert.equal((await post({ name: 'Lim', mobile: '9000000012', password: 'secret12', plan_type: 'weekly' })).status, 400);
-  const lim = await post({ name: 'Lim', mobile: '9000000012', password: 'secret12', plan_type: 'limited', plan_expires: '2099-12-31' });
-  assert.equal(lim.body.plan_type, 'limited');
-  const back = await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { plan_type: 'one_time' } });
-  assert.equal(back.body.plan_expires, null);
-  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { plan_type: 'limited' } })).status, 400);
-
-  // server-side generated password is returned once and works
-  const gen = await post({ name: 'Gen Pw', mobile: '9000000013', generate_password: true });
-  assert.equal(gen.status, 201);
-  assert.ok(gen.body.generated_password.length >= 10);
-  assert.ok(await login('9000000013', gen.body.generated_password));
-  assert.equal((await call('GET', `/api/v1/admin/restaurants/${gen.body.id}`, { token: admin })).body.generated_password, undefined);
-
-  // edit: change mobile + email + password; old login stops working; duplicates rejected
-  const upd = await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { name: 'Lim Renamed', mobile: '9000000099', email: 'lim@x.com', password: 'brandnew1' } });
-  assert.equal(upd.status, 200);
-  assert.equal(upd.body.name, 'Lim Renamed');
-  assert.ok(await login('9000000099', 'brandnew1'));
-  assert.ok(await login('lim@x.com', 'brandnew1'));
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000012', password: 'secret12' } })).status, 401);
-  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { mobile: '9000000011' } })).status, 409);
-  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { mobile: 'abc' } })).status, 400);
-  // keeping own mobile on edit is fine
-  assert.equal((await call('PATCH', `/api/v1/admin/restaurants/${lim.body.id}`, { token: admin, json: { mobile: '9000000099' } })).status, 200);
-});
-
-test('web login + dashboard pages render', async () => {
-  const res = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'email=admin@test.com&password=AdminPass123' });
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), '/admin');
-  const cookie = res.headers.get('set-cookie').split(';')[0];
-  const page = await fetch(base + '/admin', { headers: { cookie } });
-  assert.equal(page.status, 200);
-  assert.match(await page.text(), /Onboard restaurant/);
-  assert.equal((await fetch(base + '/admin', { redirect: 'manual' })).status, 302);
-});
-
-test('owner dashboard, admin list and public menu pages render', async () => {
-  const admin = await login('admin@test.com', 'AdminPass123');
-  await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Page Test', mobile: '9000000003', email: 'pt@x.com', password: 'secret12' } });
-  const owner = await login('pt@x.com', 'secret12');
+  const r = (await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Switch Cafe', mobile: '9222200001', password: 'secret12' } })).body;
+  const owner = await login('9222200001', 'secret12');
+  const sess = await sessionLogin('9222200001', 'secret12');
   const cat = (await call('POST', '/api/v1/categories', { token: owner, json: { name: 'Mains' } })).body;
   await call('POST', '/api/v1/items', { token: owner, json: { name: 'Dal', price: 80, category_id: cat.id } });
+  assert.equal((await call('GET', `/api/v1/public/menu/${r.slug}`)).status, 200);
 
-  const loginRes = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=9000000003&password=secret12' });
-  assert.equal(loginRes.headers.get('location'), '/dashboard');
-  const cookie = loginRes.headers.get('set-cookie').split(';')[0];
-  const dash = await (await fetch(base + '/dashboard', { headers: { cookie } })).text();
-  assert.match(dash, /Dal/);
-  assert.match(dash, /Change password/);
-  assert.equal((await fetch(base + '/dashboard/qr.png', { headers: { cookie } })).headers.get('content-type'), 'image/png');
-  assert.equal((await fetch(base + '/admin', { headers: { cookie }, redirect: 'manual' })).status, 302); // owner can't open admin
+  await call('PATCH', `/api/v1/admin/restaurants/${r.id}`, { token: admin, json: { active: false } });
+  assert.equal((await call('GET', '/api/v1/categories', { token: owner })).status, 401);          // token dead at once
+  assert.equal((await call('GET', '/api/v1/restaurant', { cookie: sess.cookie })).status, 401);   // so is the cookie session
+  const again = await call('POST', '/api/v1/auth/session', { json: { identifier: '9222200001', password: 'secret12' } });
+  assert.equal(again.status, 403);
+  assert.equal((await call('GET', `/api/v1/public/menu/${r.slug}`)).status, 404);
+  assert.equal((await call('GET', `/m/${r.slug}`)).status, 404);
+  assert.equal((await call('GET', '/api/v1/admin/summary', { token: admin })).body.inactive, 1);
 
-  const adminLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'email=admin@test.com&password=AdminPass123' });
-  const list = await (await fetch(base + '/admin', { headers: { cookie: adminLogin.headers.get('set-cookie').split(';')[0] } })).text();
-  assert.match(list, /Page Test/);
+  await call('PATCH', `/api/v1/admin/restaurants/${r.id}`, { token: admin, json: { active: true } });
+  assert.equal((await call('GET', `/api/v1/public/menu/${r.slug}`)).status, 200);
 
-  const menu = await (await fetch(base + '/m/page-test')).text();
-  assert.match(menu, /Dal/);
-  assert.match(menu, /name="viewport"/);
+  await call('PATCH', `/api/v1/admin/restaurants/${r.id}`, { token: admin, json: { plan_type: 'limited', plan_expires: '2000-01-01' } });
+  assert.equal((await call('GET', `/api/v1/public/menu/${r.slug}`)).status, 404);                 // expired
 });
 
-test('one-time login details after create and reset; hash never exposed', async () => {
-  const adminLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=admin@test.com&password=AdminPass123' });
-  const cookie = adminLogin.headers.get('set-cookie').split(';')[0];
-  const form = body => ({ method: 'POST', redirect: 'manual', headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' }, body });
-  const page = async () => (await fetch(base + '/admin', { headers: { cookie } })).text();
-
-  const created = await fetch(base + '/admin/restaurants', form('name=Creds+Cafe&mobile=9000000077&email=&password=Sh0wMe0nce&price_paid=1&plan_type=one_time&plan_expires='));
-  assert.equal(created.status, 302);
-  const first = await page();
-  assert.match(first, /Sh0wMe0nce/);          // shown once...
-  assert.match(first, /9000000077/);
-  assert.ok(!(await page()).includes('Sh0wMe0nce')); // ...then gone
-
-  const id = (await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000077', password: 'Sh0wMe0nce' } })).body.user.restaurant_id;
-  const reset = await fetch(base + `/admin/restaurants/${id}/reset-password`, form(''));
-  assert.equal(reset.status, 302);
-  const shown = /id="c-pass" class="mono">([^<]+)</.exec(await page());
-  assert.ok(shown && shown[1].length >= 10);
-  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000077', password: 'Sh0wMe0nce' } })).status, 401); // old password dead
-  assert.ok(await login('9000000077', shown[1]));                                                                                       // new one works
-
-  // API responses never include the hash
+test('super admin can view the password it set (encrypted at rest); owner changes clear it', async () => {
   const admin = await login('admin@test.com', 'AdminPass123');
-  assert.ok(!JSON.stringify((await call('GET', '/api/v1/admin/restaurants', { token: admin })).body).includes('password_hash'));
-});
-
-test('super admin can view the password it set (stored encrypted); owner changes clear it', async () => {
-  const { DatabaseSync } = require('node:sqlite');
-  const adminLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=admin@test.com&password=AdminPass123' });
-  const cookie = adminLogin.headers.get('set-cookie').split(';')[0];
-  const admin = await login('admin@test.com', 'AdminPass123');
-  const reveal = (id, c = cookie) => fetch(base + `/admin/restaurants/${id}/reveal-password`, { method: 'POST', redirect: 'manual', headers: { cookie: c } });
+  const reveal = (id, opts = { token: admin }) => call('POST', `/api/v1/admin/restaurants/${id}/reveal-password`, opts);
 
   const r = await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Vault Cafe', mobile: '9000000055', password: 'Vault#Pass1' } });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
-  const ok = await reveal(r.body.id);
-  assert.equal(ok.status, 200);
-  assert.equal(ok.headers.get('cache-control'), 'no-store');
-  assert.equal((await ok.json()).password, 'Vault#Pass1');
+  assert.equal(r.status, 201);
+  assert.equal(r.body.has_password, true);
+  const shown = await reveal(r.body.id);
+  assert.equal(shown.body.password, 'Vault#Pass1');
+  assert.equal(shown.headers.get('cache-control'), 'no-store');
 
-  // stored encrypted, never as plain text
+  // never stored as plain text; login still uses a bcrypt hash
   const raw = new DatabaseSync(path.join(process.env.DATA_DIR, 'app.db'), { readOnly: true });
   const row = raw.prepare("SELECT password_hash, password_enc FROM users WHERE mobile='9000000055'").get();
   raw.close();
   assert.ok(row.password_enc && !row.password_enc.includes('Vault#Pass1'));
   assert.ok(row.password_hash.startsWith('$2'));
 
-  // admin-only: not available to anonymous users or restaurant owners
-  assert.equal((await fetch(base + `/admin/restaurants/${r.body.id}/reveal-password`, { method: 'POST', redirect: 'manual' })).status, 302);
-  const ownerLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=9000000055&password=Vault%23Pass1' });
-  assert.equal((await reveal(r.body.id, ownerLogin.headers.get('set-cookie').split(';')[0])).status, 302);
+  // admin only
+  assert.equal((await call('POST', `/api/v1/admin/restaurants/${r.body.id}/reveal-password`)).status, 401);
+  const owner = await login('9000000055', 'Vault#Pass1');
+  assert.equal((await reveal(r.body.id, { token: owner })).status, 403);
 
-  // admin edit with a new password updates what is shown
+  // admin changes it => the new one is shown; reset generates one that works and is shown
   await call('PATCH', `/api/v1/admin/restaurants/${r.body.id}`, { token: admin, json: { password: 'Second#Pass2' } });
-  assert.equal((await (await reveal(r.body.id)).json()).password, 'Second#Pass2');
+  assert.equal((await reveal(r.body.id)).body.password, 'Second#Pass2');
+  const reset = await call('POST', `/api/v1/admin/restaurants/${r.body.id}/reset-password`, { token: admin });
+  assert.ok(reset.body.password.length >= 10);
+  assert.equal(reset.body.mobile, '9000000055');
+  assert.equal((await call('POST', '/api/v1/auth/login', { json: { identifier: '9000000055', password: 'Second#Pass2' } })).status, 401);
+  assert.ok(await login('9000000055', reset.body.password));
+  assert.equal((await reveal(r.body.id)).body.password, reset.body.password);
 
-  // once the owner picks their own password the admin copy is cleared (it would be stale)
-  const owner = await login('9000000055', 'Second#Pass2');
-  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner, json: { current_password: 'Second#Pass2', new_password: 'OwnerChose3' } })).status, 204);
-  assert.equal((await (await reveal(r.body.id)).json()).password, null);
-  assert.ok(!(await (await fetch(base + '/admin', { headers: { cookie } })).text()).includes('OwnerChose3'));
-
-  // the page never embeds passwords; the eye only shows for restaurants with a stored copy
-  const r2 = await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Eye Cafe', mobile: '9000000056', password: 'Eye#Pass44' } });
-  const html = await (await fetch(base + '/admin', { headers: { cookie } })).text();
-  assert.ok(!html.includes('Eye#Pass44'));
-  assert.match(html, new RegExp(`id="pw-${r2.body.id}"`));
-  assert.doesNotMatch(html, new RegExp(`id="pw-${r.body.id}"`));
+  // once the owner picks their own password, the admin copy is cleared (it would be stale)
+  const owner2 = await login('9000000055', reset.body.password);
+  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner2, json: { current_password: 'wrong', new_password: 'OwnerChose3' } })).status, 400);
+  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner2, json: { current_password: reset.body.password, new_password: 'OwnerChose3' } })).status, 204);
+  assert.equal((await reveal(r.body.id)).body.password, null);
+  const list = (await call('GET', '/api/v1/admin/restaurants', { token: admin })).body.restaurants.find(x => x.id === r.body.id);
+  assert.equal(list.has_password, false);
+  assert.ok(!JSON.stringify(list).includes('OwnerChose3'));
+  assert.ok(await login('9000000055', 'OwnerChose3'));
 });

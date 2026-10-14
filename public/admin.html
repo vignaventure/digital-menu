@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css">
+<title>Admin · Digital Menu</title></head>
+<body>
+<div class="shell">
+<aside class="side">
+  <div class="brand"><div class="mark" data-ico="shield"></div><div>Digital Menu<small>Admin console</small></div></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="restaurants" data-ico="store" data-sub="Every onboarded restaurant, its onboarding price and status"><span>Restaurants</span></button>
+    <button data-tab="onboard" data-ico="plus" data-title="Onboard restaurant" data-sub="Create the restaurant and its dashboard login"><span>Onboard restaurant</span></button>
+    <button data-tab="password" data-ico="key" data-title="Change password" data-sub="Update the password you use to log in"><span>Change password</span></button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="logout" onclick="logout()" data-ico="logout"><span>Log out</span></button>
+</aside>
+<main class="main">
+  <div class="page-head"><h1 id="pageTitle"></h1><p id="pageSub"></p></div>
+
+  <section data-panel="restaurants">
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <div class="toolbar">
+        <h3 style="margin:0">Onboarded restaurants</h3>
+        <div class="filters" style="justify-content:flex-end">
+          <input type="search" id="rSearch" placeholder="Search name, owner, email, mobile, city…" aria-label="Search restaurants">
+          <select id="rStatus" aria-label="Filter by status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="unpaid">Payment pending</option></select>
+        </div>
+      </div>
+      <div class="table-wrap" id="rList"></div>
+    </div>
+  </section>
+
+  <section data-panel="onboard">
+    <form id="obForm" class="card" autocomplete="off">
+      <h3>Restaurant details</h3>
+      <div class="row">
+        <div><label style="margin-top:0">Restaurant name</label><input name="name" required></div>
+        <div><label style="margin-top:0">Owner name</label><input name="owner" required></div>
+        <div><label>Mobile number <span class="muted small">· owner logs in with this</span></label><input name="mobile" type="tel" inputmode="tel" required placeholder="e.g. 9876543210"></div>
+        <div><label>Email <span class="muted small">· optional</span></label><input name="email" type="email"></div>
+        <div><label>City</label><input name="city"></div>
+        <div><label>Onboarding price (₹)</label><input name="price_paid" type="number" min="0" step="1" inputmode="numeric" value="0" required></div>
+        <div><label>Plan</label><select name="plan_type"><option value="one_time">One time</option><option value="limited">Limited</option></select></div>
+        <div data-validwrap class="hidden"><label>Valid until</label><input name="plan_expires" type="date"></div>
+      </div>
+      <label>Login password <span class="muted small">· leave blank to generate one</span></label>
+      <div class="pw-row"><input name="password" minlength="6" placeholder="Auto-generated if empty" autocomplete="new-password"><button type="button" class="ghost" data-genpw>Generate</button></div>
+      <label class="check"><input type="checkbox" name="paid"> Onboarding payment received</label>
+      <p class="small muted">The login password is shown once after you create the restaurant, and you can view it again later from the restaurants table.</p>
+      <div class="err" id="obErr" role="alert"></div>
+      <div class="card-foot"><button class="lg">Create restaurant &amp; login</button></div>
+    </form>
+  </section>
+
+  <section data-panel="password">
+    <form id="pwf" class="card" autocomplete="off">
+      <h3>Change password</h3><p class="small muted">Use at least 8 characters.</p>
+      <div class="row">
+        <div><label>Current password</label><input type="password" name="current_password" required autocomplete="current-password"></div>
+        <div><label>New password</label><input type="password" name="new_password" minlength="8" required autocomplete="new-password"></div>
+        <div><label>Confirm new password</label><input type="password" name="confirm_password" minlength="8" required autocomplete="new-password"></div>
+      </div>
+      <div class="err" id="pwErr" role="alert"></div><div class="card-foot"><button class="lg">Update password</button></div>
+    </form>
+  </section>
+</main>
+</div>
+<script src="/app.js"></script>
+<script>
+let restaurants = [], showTab;
+const today = new Date().toISOString().slice(0, 10);
+const expired = (r) => r.plan_expires && r.plan_expires < today;
+const planPill = (r) => !r.plan_expires ? '<span class="pill">One time</span>' : `<span class="pill ${expired(r) ? 'warn' : ''}">${expired(r) ? 'Expired ' : 'Until '}${esc(r.plan_expires)}</span>`;
+
+async function load() {
+  const [s, { restaurants: list }] = await Promise.all([api('/api/v1/admin/summary'), api('/api/v1/admin/restaurants')]);
+  restaurants = list;
+  $('#stats').innerHTML = [['Total restaurants', s.restaurants, 'hl big'], ['Active', s.active], ['Inactive', s.inactive], ['Onboarding revenue', money(s.revenue)], ['Payment pending', money(s.outstanding)]]
+    .map(([l, v, c]) => `<div class="stat ${c || ''}"><span>${l}</span><b>${v}</b></div>`).join('');
+  render();
+}
+
+function render() {
+  const q = $('#rSearch').value.trim().toLowerCase(), st = $('#rStatus').value;
+  const ok = (r) => !st || (st === 'active' ? r.active : st === 'inactive' ? !r.active : !r.paid);
+  const rows = restaurants.filter((r) => ok(r) && (!q || [r.name, r.owner, r.owner_email, r.owner_mobile, r.city].some((v) => String(v || '').toLowerCase().includes(q))));
+  $('#rList').innerHTML = rows.length ? `<table><thead><tr><th>Restaurant</th><th>Owner</th><th>Mobile</th><th>Email</th><th>Password</th><th>Plan</th><th>Onboarding price</th><th>Payment</th><th>Items</th><th>Status</th><th>Action</th></tr></thead><tbody>${
+    rows.map((r) => `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.owner) || '—'}</td><td>${esc(r.owner_mobile) || '—'}</td><td>${esc(r.owner_email) || '—'}</td>
+      <td>${r.has_password ? `<span class="pwcell"><span class="pwtxt" data-pwtxt="${r.id}">••••••••</span><button class="ghost sm icon" data-eye="${r.id}" aria-pressed="false" aria-label="Show password" title="Show / hide password">${ico('eye')}</button></span>` : '<span class="muted" title="Changed by the owner. Use Reset password to set a new one.">Not available</span>'}</td>
+      <td>${planPill(r)}</td><td>${money(r.price_paid)}</td>
+      <td>${r.paid ? '<span class="pill ok">Paid</span>' : '<span class="pill warn">Pending</span>'}</td><td>${r.item_count}</td>
+      <td>${r.active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Inactive</span>'}</td>
+      <td><div class="actions" style="flex-wrap:nowrap"><button class="sm ghost" data-view="${r.id}">View</button><button class="sm" data-edit="${r.id}">Edit</button>
+        <button class="sm ghost" data-reset="${r.id}">Reset password</button><button class="sm ${r.active ? 'danger' : 'ghost'}" data-toggle="${r.id}">${r.active ? 'Deactivate' : 'Activate'}</button><button class="sm danger" data-del="${r.id}">Delete</button></div></td></tr>`).join('')
+  }</tbody></table>` : `<p class="empty">${restaurants.length ? 'No restaurants match your search or filter.' : 'No restaurants yet. Use “Onboard restaurant” to add the first one.'}</p>`;
+}
+['input', 'change'].forEach((ev) => ['#rSearch', '#rStatus'].forEach((id) => $(id).addEventListener(ev, render)));
+
+const kv = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+function credentialsModal(title, r, password) {
+  const login = location.origin + '/login';
+  const text = `Digital Menu login\nLogin: ${login}\nMobile: ${r.owner_mobile || r.mobile}${(r.owner_email || r.email) ? `\nEmail: ${r.owner_email || r.email}` : ''}\nPassword: ${password}${r.menu_url ? `\nYour menu: ${r.menu_url}` : ''}`;
+  const m = openModal({ title, sub: 'Share these with the restaurant. You can view the password again from the table.', html: `
+    <div class="kv-grid">${kv('Mobile', esc(r.owner_mobile || r.mobile))}${(r.owner_email || r.email) ? kv('Email', esc(r.owner_email || r.email)) : ''}${kv('Password', `<span class="secret">${esc(password)}</span>`)}${kv('Login page', esc(login))}${r.menu_url ? kv('Menu link', esc(r.menu_url)) : ''}</div>
+    <div class="card-foot"><button class="ghost" data-close>Close</button><button id="copyCreds">Copy details</button></div>` });
+  $('#copyCreds', m).addEventListener('click', () => copyText(text));
+}
+// plan select shows "valid until" only for limited plans
+const planToggle = (scope) => {
+  const sel = $('[name=plan_type]', scope), wrap = $('[data-validwrap]', scope), date = $('[name=plan_expires]', scope);
+  const sync = () => { const lim = sel.value === 'limited'; wrap.classList.toggle('hidden', !lim); date.required = lim; if (!lim) date.value = ''; };
+  sel.addEventListener('change', sync); sync();
+};
+const wireGenerate = (scope) => $('[data-genpw]', scope).addEventListener('click', () => { const i = $('[name=password]', scope); i.value = genPassword(); i.focus(); i.select(); });
+planToggle($('#obForm')); wireGenerate($('#obForm'));
+
+// hide a revealed password again
+function hidePw(b) { const t = document.querySelector(`[data-pwtxt="${b.dataset.eye}"]`); t.textContent = '••••••••'; t.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', 'Show password'); b.innerHTML = ico('eye'); clearTimeout(b._t); }
+
+document.addEventListener('click', async (e) => {
+  const id = (k) => e.target.closest(`[data-${k}]`)?.dataset[k];
+  const get = (v) => restaurants.find((r) => r.id == v);
+  try {
+    if (id('eye')) {
+      const b = e.target.closest('[data-eye]');
+      if (b.getAttribute('aria-pressed') === 'true') return hidePw(b);
+      const t = document.querySelector(`[data-pwtxt="${b.dataset.eye}"]`); b.disabled = true;
+      try {
+        const { password } = await api(`/api/v1/admin/restaurants/${b.dataset.eye}/reveal-password`, 'POST');
+        if (!password) { toast('Password not available. Use Reset password.'); return; }
+        t.textContent = password; t.classList.add('on'); b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Hide password'); b.innerHTML = ico('eyeoff');
+        b._t = setTimeout(() => hidePw(b), 30000); // auto-hide after 30 seconds
+      } finally { b.disabled = false; }
+    } else if (id('view')) {
+      const r = get(id('view'));
+      openModal({ title: r.name, sub: `Onboarded ${new Date(r.created_at + 'Z').toLocaleDateString('en-IN', { dateStyle: 'medium' })}`, html: `<div class="kv-grid">${kv('Owner', esc(r.owner) || '—')}${kv('Mobile (login)', esc(r.owner_mobile) || '—')}${kv('Email', esc(r.owner_email) || '—')}${kv('City', esc(r.city) || '—')}
+        ${kv('Plan', r.plan_expires ? `Limited · until ${esc(r.plan_expires)}${expired(r) ? ' (expired)' : ''}` : 'One time')}${kv('Onboarding price', money(r.price_paid))}${kv('Payment', r.paid ? 'Paid' : 'Pending')}${kv('Status', r.active ? 'Active' : 'Inactive')}${kv('Menu items', r.item_count)}
+        ${kv('Menu link', `<a href="${esc(r.menu_url)}" target="_blank" rel="noopener">${esc(r.menu_url)}</a>`)}</div>` });
+    } else if (id('edit')) {
+      const r = get(id('edit'));
+      const m = openModal({ title: `Edit ${r.name}`, wide: true, html: `<form id="editForm" autocomplete="off"><div class="row">
+        <div><label style="margin-top:0">Restaurant name</label><input name="name" value="${esc(r.name)}" required></div><div><label style="margin-top:0">Owner</label><input name="owner" value="${esc(r.owner)}" required></div>
+        <div><label>Mobile number</label><input name="mobile" type="tel" value="${esc(r.owner_mobile)}" required></div><div><label>Email <span class="muted small">· optional</span></label><input name="email" type="email" value="${esc(r.owner_email)}"></div>
+        <div><label>City</label><input name="city" value="${esc(r.city)}"></div><div><label>Onboarding price (₹)</label><input name="price_paid" type="number" min="0" step="1" value="${r.price_paid}" required></div>
+        <div><label>Plan</label><select name="plan_type"><option value="one_time" ${r.plan_expires ? '' : 'selected'}>One time</option><option value="limited" ${r.plan_expires ? 'selected' : ''}>Limited</option></select></div>
+        <div data-validwrap><label>Valid until</label><input name="plan_expires" type="date" value="${esc(r.plan_expires)}"></div></div>
+        <label>New login password <span class="muted small">· leave blank to keep the current one</span></label>
+        <div class="pw-row"><input name="password" minlength="6" placeholder="Unchanged" autocomplete="new-password"><button type="button" class="ghost" data-genpw>Generate</button></div>
+        <label class="check"><input type="checkbox" name="paid" ${r.paid ? 'checked' : ''}> Onboarding payment received</label><div class="err" id="editErr" role="alert"></div>
+        <div class="card-foot"><button type="button" class="ghost" data-close>Cancel</button><button>Save changes</button></div></form>` });
+      const form = $('#editForm', m); planToggle(form); wireGenerate(form);
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault(); const f = Object.fromEntries(new FormData(ev.target)); f.paid = ev.target.elements.paid.checked; if (!f.password) delete f.password;
+        try {
+          const out = await api(`/api/v1/admin/restaurants/${r.id}`, 'PATCH', f); closeModal(); toast('Restaurant updated'); await load();
+          if (f.password) credentialsModal('Password changed', out, f.password);
+        } catch (er) { $('#editErr', m).textContent = er.message; }
+      });
+    } else if (id('reset')) {
+      const r = get(id('reset'));
+      if (await confirmDialog({ title: `Reset password for ${r.name}?`, message: 'A new password is generated. The old one stops working immediately.', confirmText: 'Reset password' })) {
+        const out = await api(`/api/v1/admin/restaurants/${r.id}/reset-password`, 'POST'); credentialsModal('New password', { ...r, owner_mobile: out.mobile, owner_email: out.email }, out.password); load();
+      }
+    } else if (id('toggle')) {
+      const r = get(id('toggle')), off = r.active;
+      if (await confirmDialog(off ? { title: `Deactivate ${r.name}?`, message: 'Their menu will stop showing and they will not be able to log in.', confirmText: 'Deactivate', danger: true } : { title: `Activate ${r.name}?`, message: 'They can log in again and their menu will be visible.', confirmText: 'Activate' })) {
+        await api(`/api/v1/admin/restaurants/${r.id}`, 'PATCH', { active: !off }); toast(off ? 'Restaurant deactivated' : 'Restaurant activated'); load();
+      }
+    } else if (id('del')) {
+      const r = get(id('del'));
+      if (await confirmDialog({ title: `Delete ${r.name}?`, message: 'This permanently removes the restaurant, its login, menu items and photos. This cannot be undone.', confirmText: 'Delete restaurant', danger: true })) {
+        await api(`/api/v1/admin/restaurants/${r.id}`, 'DELETE'); toast('Restaurant deleted'); load();
+      }
+    }
+  } catch (er) { toast(er.message); }
+});
+
+$('#obForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#obErr').textContent = ''; const f = Object.fromEntries(new FormData(e.target)); f.paid = e.target.elements.paid.checked; if (!f.password) delete f.password;
+  try {
+    const out = await api('/api/v1/admin/restaurants', 'POST', f); e.target.reset(); e.target.elements.plan_type.dispatchEvent(new Event('change'));
+    await load(); showTab('restaurants'); credentialsModal('Restaurant created', out, out.generated_password || f.password);
+  } catch (er) { $('#obErr').textContent = er.message; }
+});
+$('#pwf').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#pwErr').textContent = ''; const f = Object.fromEntries(new FormData(e.target));
+  if (f.new_password !== f.confirm_password) { $('#pwErr').textContent = 'New passwords do not match'; return; }
+  try { await api('/api/v1/auth/password', 'POST', f); e.target.reset(); toast('Password updated'); } catch (er) { $('#pwErr').textContent = er.message; }
+});
+
+(async () => { await requireRole('admin'); await load(); showTab = tabs($('#tabs')); })();
+</script>
+</body></html>

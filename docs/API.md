@@ -1,48 +1,60 @@
 # REST API (`/api/v1`)
 
-JSON in/out. Authenticate with `Authorization: Bearer <token>` (token from `POST /auth/login`, valid 12h).
-Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 / 15 min / IP).
+The dashboards in this app use this same API, so everything they can do is available to your own clients too.
+
+JSON in/out. Two ways to authenticate:
+
+- **Bearer token** for API clients: `POST /auth/login`, then send `Authorization: Bearer <token>` (valid 12h).
+- **Login cookie** for browsers: `POST /auth/session` sets an HTTP-only cookie. Writes made with the cookie must come from the same site (the `Origin` header is checked).
+
+Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 / 15 min / IP; `LOGIN_RATE_LIMIT` to change).
 
 ## Public (no auth)
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/public/menu/:slug` | Menu for customers: `{restaurant, categories:[{id,name,items:[…]}]}`. 404 if disabled/expired. Only available items. |
+| GET | `/public/menu/:slug` | Menu for customers: `{restaurant:{name,tagline,theme_color,logo,city,address,phone}, categories:[{id,name,items:[…]}]}`. 404 if inactive/expired. Only available items. |
 | GET | `/health` (root, not `/api/v1`) | Liveness probe |
 
 ## Auth
 | Method | Path | Body |
 |---|---|---|
-| POST | `/auth/login` | `{identifier, password}` where `identifier` is the user's **email or mobile number** (`email` is accepted as an alias) → `{token, expires_in, user}` |
-| GET | `/auth/me` | |
-| POST | `/auth/password` | `{current_password, new_password}` → 204 |
+| POST | `/auth/login` | `{identifier, password}`, where `identifier` is the user's **email or mobile number** (`email` is accepted as an alias) → `{token, expires_in, user}` |
+| POST | `/auth/session` | same body → sets the login cookie, returns `{role, user}` |
+| DELETE | `/auth/session` | log out (cookie) → 204 |
+| GET | `/auth/me` | `{user}` |
+| POST | `/auth/password` | `{current_password, new_password}` → 204. If an owner changes their own password, the copy the admin can view is cleared. |
 
 ## Super admin (role `admin`)
-| Method | Path | Body |
+| Method | Path | Body / notes |
 |---|---|---|
-| GET | `/admin/restaurants` | |
-| POST | `/admin/restaurants` | `{name, mobile, email?, password, price_paid?, plan_type?, plan_expires?}` → 201. Creates the restaurant **and** the owner login. `mobile` is required (7-15 digits, optional leading `+`; spaces/dashes ignored) and is the owner's login; `email` is optional. `plan_type` is `one_time` (never expires, default) or `limited` (requires `plan_expires`, `YYYY-MM-DD`). Send `generate_password: true` instead of `password` to have one generated; it is returned once as `generated_password`. 409 if the mobile/email is already used. |
+| GET | `/admin/summary` | `{restaurants, active, inactive, revenue, outstanding}`. Revenue counts onboarding prices marked paid. |
+| GET | `/admin/restaurants` | List. Each has `owner`, `city`, `owner_mobile`, `owner_email`, `price_paid`, `paid`, `plan_type`, `plan_expires`, `active`, `has_password`, `item_count`, `menu_url`, … |
+| POST | `/admin/restaurants` | `{name, mobile, owner?, email?, city?, price_paid?, paid?, password?, plan_type?, plan_expires?}` → 201. Creates the restaurant **and** the owner login. `mobile` is required (7-15 digits, optional `+`; spaces/dashes ignored) and is the owner's login. `email` is optional. A blank `password` is **generated** and returned once as `generated_password`. `plan_type` is `one_time` (never expires, default) or `limited` (needs `plan_expires`, `YYYY-MM-DD`). 409 if the mobile/email is already used. |
 | GET | `/admin/restaurants/:id` | |
-| PATCH | `/admin/restaurants/:id` | any of `{name, active, price_paid, plan_type, plan_expires, mobile, email, password}`. `active:false` makes the restaurant inactive (menu hidden, owner locked out). `mobile`/`email`/`password` change the owner's login. |
-| POST | `/admin/restaurants/:id/password` | `{password}` → 204 (reset owner password) |
-| DELETE | `/admin/restaurants/:id` | → 204, removes all data and images |
+| PATCH | `/admin/restaurants/:id` | any of `{name, owner, city, active, price_paid, paid, plan_type, plan_expires, mobile, email, password}`. `active:false` deactivates (menu hidden, owner locked out at once). |
+| POST | `/admin/restaurants/:id/reset-password` | Generates a new password → `{mobile, email, password}` |
+| POST | `/admin/restaurants/:id/password` | `{password}` sets a specific one → 204 |
+| POST | `/admin/restaurants/:id/reveal-password` | `{password}`: the password the admin set (stored encrypted), or `null` if the owner changed it since. |
+| DELETE | `/admin/restaurants/:id` | → 204, removes all data and photos |
 
 ## Restaurant owner (role `owner`)
-| Method | Path | Body |
+| Method | Path | Body / notes |
 |---|---|---|
-| GET | `/restaurant` | Includes `menu_url` |
-| GET/POST | `/categories` | POST `{name}` |
-| PUT/DELETE | `/categories/:id` | PUT `{name}`; DELETE also removes its items |
-| GET | `/items?category_id=` | |
-| POST | `/items` | JSON or `multipart/form-data`: `name, description, price, category_id, image` (jpeg/png/webp/gif ≤ 5MB) |
-| GET/PUT/DELETE | `/items/:id` | PUT same fields as POST; omit `image` to keep the current one |
-| PATCH | `/items/:id/availability` | `{available: true|false}` (omit to toggle) |
-| GET | `/qr.png` | PNG QR for the menu URL; `?download=1`, `?size=800` |
+| GET | `/restaurant` | The restaurant's profile incl. `menu_url` |
+| PATCH | `/restaurant` | `{name, owner, contact_phone, city, address, tagline, theme_color (#rrggbb), logo (data URL), remove_logo}` |
+| GET / POST | `/categories` | GET includes each category's `items` count. POST `{name}` |
+| PUT / DELETE | `/categories/:id` | PUT `{name}`. DELETE is refused with 409 while the category still has items. |
+| GET | `/items?category_id=` | Each item has `price` (rupees), `image` (path), `image_url` (absolute), `available`, `category` |
+| POST | `/items` | `{name, price, category_id, description?, available?, image?}`. `image` is a PNG/JPEG/WebP **data URL** (≤ ~1.5 MB); alternatively send `multipart/form-data` with a file field `image`. |
+| GET / PUT / DELETE | `/items/:id` | PUT takes the same fields; omit `image` to keep the photo, send `remove_image: true` to clear it. |
+| PATCH | `/items/:id/availability` | `{available: true\|false}` (omit to toggle) |
+| GET | `/qr.png` | PNG QR for the menu URL; `?size=800` (128-2048), `?download=1` |
 
 ### Example
 ```bash
 TOKEN=$(curl -s -X POST $URL/api/v1/auth/login -H 'content-type: application/json' \
-  -d '{"email":"owner@spice.com","password":"secret12"}' | jq -r .token)
+  -d '{"identifier":"9876543210","password":"secret12"}' | jq -r .token)
 
-curl -X POST $URL/api/v1/items -H "authorization: Bearer $TOKEN" \
-  -F name="Paneer Tikka" -F description="Smoky" -F price=199 -F category_id=1 -F image=@tikka.jpg
+curl -X POST $URL/api/v1/items -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"Paneer Tikka","description":"Smoky","price":199,"category_id":1}'
 ```

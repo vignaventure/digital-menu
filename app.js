@@ -20,9 +20,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:'],
+      imgSrc: ["'self'", 'data:', 'blob:'], // blob: = photo preview while resizing before upload
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"], // dashboard uses inline confirm()/print() handlers
+      scriptSrcAttr: ["'unsafe-inline'"], // pages use small inline handlers such as onclick="logout()"
       styleSrc: ["'self'", "'unsafe-inline'"],
       upgradeInsecureRequests: isProd ? [] : null,
     },
@@ -40,9 +40,6 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: isProd ? '1h' :
 // Upload names are random UUIDs, so they can be cached forever.
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
 
-app.use('/api/v1', require('./routes/api'));
-
-app.use(express.urlencoded({ extended: false }));
 app.use(session({
   name: 'sid',
   secret: SESSION_SECRET,
@@ -50,14 +47,16 @@ app.use(session({
   resave: false, saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'lax', secure: isProd ? 'auto' : false, maxAge: 1000 * 60 * 60 * 12 },
 }));
+app.use('/api/v1', require('./routes/api'));
 app.use(require('./routes/web'));
 
-app.use((req, res) => (req.path.startsWith('/api/') ? res.status(404).json({ error: 'Not found' }) : res.status(404).render('unavailable')));
+app.use((req, res) => (req.path.startsWith('/api/') ? res.status(404).json({ error: 'Not found' }) : res.status(404).type('text').send('Page not found')));
 
 app.use((err, req, res, next) => {
   let status = err.status || 500, message = err.message;
   if (err instanceof multer.MulterError) { status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400; message = err.code === 'LIMIT_FILE_SIZE' ? 'Image too large (max 5MB)' : err.message; }
   else if (err.type === 'entity.parse.failed') { status = 400; message = 'Invalid JSON'; }
+  else if (err.type === 'entity.too.large') { status = 413; message = 'That image is too large'; }
   else if (!(err instanceof HttpError) && !(status < 500)) { console.error(err); message = 'Internal server error'; }
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
   res.status(status).send(status < 500 ? message : 'Something went wrong');
