@@ -1,9 +1,46 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Login · Menu Card</title><link rel="stylesheet" href="/style.css"></head><body>
-<form class="panel login" method="post" action="/login">
-  <h1>Menu Card</h1><p style="color:var(--mute)">Sign in to your dashboard</p>
-  <% if (error) { %><div class="err"><%= error %></div><% } %>
-  <label>Email</label><input type="email" name="email" required autofocus>
-  <label>Password</label><input type="password" name="password" required>
-  <p><button style="width:100%">Sign in</button></p>
-</form></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login · Vigna Digital Menu</title>
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/auth.css"></head><body class="auth">
+
+<aside class="auth-side">
+  <a class="auth-logo" href="/"><span class="lp-mark">▦</span> Vigna Digital <b>Menu</b></a>
+  <div class="auth-pitch">
+    <h2>Your whole menu,<br>one scan away.</h2>
+    <p>Manage dishes, prices and photos from one dashboard. Guests see every change instantly.</p>
+    <ul>
+      <li>📱 Mobile-friendly card menu</li>
+      <li>🔳 Your own printable QR code</li>
+      <li>⚡ Update prices in seconds</li>
+    </ul>
+  </div>
+  <small>© <%= new Date().getFullYear() %> Vigna Digital</small>
+</aside>
+
+<main class="auth-main">
+  <form class="auth-card" method="post" action="/login">
+    <a class="auth-logo auth-logo-m" href="/"><span class="lp-mark">▦</span> Vigna Digital <b>Menu</b></a>
+    <h1>Welcome back</h1>
+    <p class="auth-sub">Sign in to manage your menu</p>
+
+    <% if (error) { %><div class="auth-err" role="alert"><%= error %></div><% } %>
+
+    <label for="email">Email</label>
+    <input id="email" type="email" name="email" autocomplete="username" placeholder="you@restaurant.com" required autofocus>
+
+    <label for="password">Password</label>
+    <div class="auth-pw">
+      <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Your password" required>
+      <button type="button" id="pwtoggle" aria-label="Show password">Show</button>
+    </div>
+
+    <button class="auth-submit">Sign in</button>
+    <p class="auth-foot">No account yet? Contact us and we will set up your restaurant.<br><a href="/">← Back to home</a></p>
+  </form>
+</main>
+
+<script>
+const pw=document.getElementById('password'),t=document.getElementById('pwtoggle');
+t.addEventListener('click',()=>{const show=pw.type==='password';pw.type=show?'text':'password';t.textContent=show?'Hide':'Show';t.setAttribute('aria-label',show?'Hide password':'Show password');});
+</script>
+</body></html>
