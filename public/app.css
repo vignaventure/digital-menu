@@ -175,11 +175,6 @@ details.fold[open] summary::after{content:'–'}
   .tbl td.t-name::before{display:none}
 }
 
-/* admin: the 5-column table needs more room than the dashboard layout gives it */
-@media(min-width:960px) and (max-width:1179px){
-  .app-grid.admin{grid-template-columns:1fr}
-  .app-grid.admin .sticky{position:static}
-}
 
 /* ---- themed confirmation popup (public/confirm.js) ---- */
 body.modal-open{overflow:hidden}
@@ -208,3 +203,17 @@ body.modal-open{overflow:hidden}
 .creds dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
 .creds dd{margin:2px 0 0;font-weight:600;word-break:break-all}
 .creds #c-pass{font-size:1.1rem;color:var(--ink);letter-spacing:.03em}
+
+/* ---- admin: full-width layout ---- */
+.app-wrap.full{max-width:1760px;padding:0 28px}
+@media(max-width:560px){.app-wrap.full{padding:0 14px}}
+details.onboard{margin-bottom:18px}
+details.onboard summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:1.02rem}
+details.onboard summary::-webkit-details-marker{display:none}
+details.onboard summary::after{content:'▾';color:var(--mute);transition:transform .2s}
+details.onboard[open] summary::after{transform:rotate(180deg)}
+details.onboard form{margin-top:14px;padding-top:6px;border-top:1px solid var(--line)}
+.fgrid{display:grid;gap:0 18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.fgrid .f{min-width:0}
+.tablebox{padding:20px 22px}
+.t-email{color:var(--mute);word-break:break-all}

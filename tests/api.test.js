@@ -184,7 +184,7 @@ test('web login + dashboard pages render', async () => {
   const cookie = res.headers.get('set-cookie').split(';')[0];
   const page = await fetch(base + '/admin', { headers: { cookie } });
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Onboard restaurant/);
+  assert.match(await page.text(), /Onboard new restaurant/);
   assert.equal((await fetch(base + '/admin', { redirect: 'manual' })).status, 302);
 });
 

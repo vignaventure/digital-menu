@@ -12,12 +12,12 @@
 <title>Admin · Vigna Digital Menu</title>
 <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app.css"></head><body class="app">
 
-<header class="app-bar"><div class="app-wrap">
+<header class="app-bar"><div class="app-wrap full">
   <a class="app-brand" href="/admin"><i class="mark">▦</i><span>Vigna Digital Menu<small>Super admin</small></span></a>
   <div class="app-actions"><form method="post" action="/logout"><button class="ghost">Logout</button></form></div>
 </div></header>
 
-<main class="app-wrap">
+<main class="app-wrap full">
   <div class="app-title"><h1>Restaurants</h1><p>Onboard new customers and manage their accounts.</p></div>
 
   <div class="stats">
@@ -40,99 +40,101 @@
   </section>
   <% } %>
 
-  <div class="app-grid admin">
-    <form class="box sticky <%= edit ? 'edit' : '' %>" method="post" action="<%= edit ? '/admin/restaurants/' + edit.id : '/admin/restaurants' %>" autocomplete="off">
-      <h2><%= edit ? 'Edit restaurant' : 'Onboard restaurant' %><% if (edit) { %><small><%= edit.name %></small><% } %></h2>
+  <% const formOpen = !!(edit || form || error || !rows.length); %>
+  <details class="box onboard <%= edit ? 'edit' : '' %>" id="onboard" <%= formOpen ? 'open' : '' %>>
+    <summary><%= edit ? 'Edit restaurant: ' + edit.name : '+ Onboard new restaurant' %></summary>
+    <form method="post" action="<%= edit ? '/admin/restaurants/' + edit.id : '/admin/restaurants' %>" autocomplete="off">
       <% if (error) { %><div class="flash err" role="alert"><%= error %></div><% } %>
+      <div class="fgrid">
+        <div class="f"><label for="name">Restaurant name</label>
+          <input id="name" name="name" required value="<%= f.name || '' %>"></div>
 
-      <label for="name">Restaurant name</label>
-      <input id="name" name="name" required value="<%= f.name || '' %>">
+        <div class="f"><label for="mobile">Owner mobile <small class="req" title="Used as the owner's login">required</small></label>
+          <input id="mobile" type="tel" name="mobile" inputmode="tel" placeholder="e.g. 9876543210 or +919876543210" required value="<%= f.mobile || '' %>"></div>
 
-      <label for="mobile">Owner mobile number <small class="req">required · used to log in</small></label>
-      <input id="mobile" type="tel" name="mobile" inputmode="tel" placeholder="e.g. 9876543210 or +919876543210" required value="<%= f.mobile || '' %>">
+        <div class="f"><label for="email">Owner email <small class="opt">optional</small></label>
+          <input id="email" type="email" name="email" placeholder="owner@restaurant.com" value="<%= f.email || '' %>"></div>
 
-      <label for="email">Owner email <small class="opt">optional</small></label>
-      <input id="email" type="email" name="email" placeholder="owner@restaurant.com" value="<%= f.email || '' %>">
+        <div class="f"><label for="password"><%= edit ? 'New password' : 'Password' %> <small class="opt"><%= edit ? 'blank = keep current' : 'min 6 characters' %></small></label>
+          <div class="pwrow">
+            <input id="password" name="password" minlength="6" <%= edit ? '' : 'required' %> placeholder="<%= edit ? 'Unchanged' : 'Type or generate' %>">
+            <button type="button" class="ghost sm" id="genpw">Generate</button>
+            <button type="button" class="ghost sm" id="cppw">Copy</button>
+          </div></div>
 
-      <label for="password"><%= edit ? 'New password' : 'Password' %> <small class="opt"><%= edit ? 'leave blank to keep the current one' : 'min 6 characters' %></small></label>
-      <div class="pwrow">
-        <input id="password" name="password" minlength="6" <%= edit ? '' : 'required' %> placeholder="<%= edit ? 'Unchanged' : 'Type or generate' %>">
-        <button type="button" class="ghost sm" id="genpw">Generate</button>
-        <button type="button" class="ghost sm" id="cppw">Copy</button>
+        <div class="f"><label for="price_paid">Price paid</label>
+          <input id="price_paid" type="number" name="price_paid" min="0" step="0.01" value="<%= f.price_paid ?? 0 %>"></div>
+
+        <div class="f"><label>Plan</label>
+          <div class="seg" role="radiogroup" aria-label="Plan type">
+            <label><input type="radio" name="plan_type" value="one_time" <%= limited ? '' : 'checked' %>><span>One time</span></label>
+            <label><input type="radio" name="plan_type" value="limited" <%= limited ? 'checked' : '' %>><span>Limited</span></label>
+          </div>
+          <p class="hint" id="planhint" style="margin-top:6px"><%= limited ? 'Menu stops working after the valid-until date.' : 'One-time plans never expire.' %></p></div>
+
+        <div class="f" id="validwrap" style="<%= limited ? '' : 'display:none' %>"><label for="plan_expires">Valid until</label>
+          <input id="plan_expires" type="date" name="plan_expires" value="<%= f.plan_expires || '' %>" <%= limited ? 'required' : '' %>></div>
       </div>
-
-      <label for="price_paid">Price paid</label>
-      <input id="price_paid" type="number" name="price_paid" min="0" step="0.01" value="<%= f.price_paid ?? 0 %>">
-
-      <label>Plan</label>
-      <div class="seg" role="radiogroup" aria-label="Plan type">
-        <label><input type="radio" name="plan_type" value="one_time" <%= limited ? '' : 'checked' %>><span>One time</span></label>
-        <label><input type="radio" name="plan_type" value="limited" <%= limited ? 'checked' : '' %>><span>Limited</span></label>
-      </div>
-      <div id="validwrap" style="<%= limited ? '' : 'display:none' %>">
-        <label for="plan_expires">Valid until</label>
-        <input id="plan_expires" type="date" name="plan_expires" value="<%= f.plan_expires || '' %>" <%= limited ? 'required' : '' %>>
-      </div>
-      <p class="hint" id="planhint" style="margin-top:8px"><%= limited ? 'Menu stops working after this date.' : 'One-time plans never expire.' %></p>
-
       <div class="form-actions">
-        <button style="flex:1"><%= edit ? 'Save changes' : 'Create account' %></button>
+        <button><%= edit ? 'Save changes' : 'Create account' %></button>
         <% if (edit) { %><a class="btn ghost" href="/admin">Cancel</a><% } %>
       </div>
     </form>
+  </details>
 
-    <section class="box">
-      <h2>All restaurants <small><%= rows.length %> total</small></h2>
-      <% if (ok) { %><div class="flash ok"><%= ok %></div><% } %>
-      <% if (!rows.length) { %>
-        <div class="empty"><b>No restaurants yet</b>Use the form to onboard your first customer.</div>
-      <% } else { %>
-      <div class="tbl-wrap">
-      <table class="tbl">
-        <thead><tr><th>Restaurant</th><th>Login</th><th>Plan</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-        <% rows.forEach(r => { const expired = r.plan_expires && r.plan_expires < today; %>
-          <tr class="<%= edit && edit.id === r.id ? 'sel' : '' %> <%= r.active ? '' : 'inactive' %>">
-            <td data-label="Restaurant" class="t-name">
-              <div class="avatar"><%= r.name.charAt(0) %></div>
-              <div><a href="/m/<%= r.slug %>" target="_blank" rel="noopener"><%= r.name %> ↗</a><br><small class="muted"><%= r.item_count %> items</small></div>
-            </td>
-            <td data-label="Login"><%= r.mobile || '—' %><% if (r.email) { %><br><small class="muted"><%= r.email %></small><% } %></td>
-            <td data-label="Plan">
-              <% if (!r.plan_expires) { %><span class="chip">One time</span>
-              <% } else { %><span class="chip <%= expired ? 'warn' : '' %>"><%= expired ? 'Expired ' : 'Until ' %><%= r.plan_expires %></span><% } %>
-              <br><small class="muted">Paid <%= r.price_paid %></small>
-            </td>
-            <td data-label="Status">
-              <form method="post" action="/admin/restaurants/<%= r.id %>/toggle" class="sw-form"
-                    data-confirm="<%= r.active ? 'Make ' + r.name + ' inactive?' : 'Activate ' + r.name + '?' %>"
-                    data-confirm-text="<%= r.active ? 'Its menu will stop working and the owner will not be able to log in.' : 'Its menu and the owner login will start working again.' %>"
-                    data-confirm-ok="<%= r.active ? 'Make inactive' : 'Activate' %>"
-                    data-confirm-tone="<%= r.active ? 'danger' : 'brand' %>">
-                <button class="sw <%= r.active ? 'on' : '' %>" role="switch" aria-checked="<%= r.active %>"
-                        aria-label="<%= r.active ? 'Active, click to deactivate' : 'Inactive, click to activate' %>"><i></i></button>
-                <span class="<%= r.active ? 'sw-on' : 'sw-off' %>"><%= r.active ? 'Active' : 'Inactive' %></span>
-              </form>
-            </td>
-            <td data-label="Actions">
-              <div class="row-actions">
-                <a class="btn ghost sm" href="/admin?edit=<%= r.id %>">Edit</a>
-                <form method="post" action="/admin/restaurants/<%= r.id %>/reset-password"
-                      data-confirm="Reset password for <%= r.name %>?" data-confirm-text="A new password is generated and shown once. The old password stops working immediately."
-                      data-confirm-ok="Reset password" data-confirm-tone="brand"><button class="ghost sm">Reset password</button></form>
-                <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
-                      data-confirm="Delete <%= r.name %>?" data-confirm-text="This permanently removes the restaurant, its owner login and all its menu items and photos. This cannot be undone."
-                      data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form>
-              </div>
-            </td>
-          </tr>
-        <% }) %>
-        </tbody>
-      </table>
-      </div>
-      <% } %>
-    </section>
-  </div>
+  <section class="box tablebox">
+    <h2>All restaurants <small><%= rows.length %> total</small></h2>
+    <% if (ok) { %><div class="flash ok"><%= ok %></div><% } %>
+    <% if (!rows.length) { %>
+      <div class="empty"><b>No restaurants yet</b>Use the form above to onboard your first customer.</div>
+    <% } else { %>
+    <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>Restaurant</th><th>Mobile</th><th>Email</th><th>Plan</th><th>Paid</th><th>Items</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      <% rows.forEach(r => { const expired = r.plan_expires && r.plan_expires < today; %>
+        <tr class="<%= edit && edit.id === r.id ? 'sel' : '' %> <%= r.active ? '' : 'inactive' %>">
+          <td data-label="Restaurant" class="t-name">
+            <div class="avatar"><%= r.name.charAt(0) %></div>
+            <a href="/m/<%= r.slug %>" target="_blank" rel="noopener"><%= r.name %> ↗</a>
+          </td>
+          <td data-label="Mobile"><%= r.mobile || '—' %></td>
+          <td data-label="Email" class="t-email"><%= r.email || '—' %></td>
+          <td data-label="Plan">
+            <% if (!r.plan_expires) { %><span class="chip">One time</span>
+            <% } else { %><span class="chip <%= expired ? 'warn' : '' %>"><%= expired ? 'Expired ' : 'Until ' %><%= r.plan_expires %></span><% } %>
+          </td>
+          <td data-label="Paid"><%= r.price_paid %></td>
+          <td data-label="Items"><%= r.item_count %></td>
+          <td data-label="Status">
+            <form method="post" action="/admin/restaurants/<%= r.id %>/toggle" class="sw-form"
+                  data-confirm="<%= r.active ? 'Make ' + r.name + ' inactive?' : 'Activate ' + r.name + '?' %>"
+                  data-confirm-text="<%= r.active ? 'Its menu will stop working and the owner will not be able to log in.' : 'Its menu and the owner login will start working again.' %>"
+                  data-confirm-ok="<%= r.active ? 'Make inactive' : 'Activate' %>"
+                  data-confirm-tone="<%= r.active ? 'danger' : 'brand' %>">
+              <button class="sw <%= r.active ? 'on' : '' %>" role="switch" aria-checked="<%= r.active %>"
+                      aria-label="<%= r.active ? 'Active, click to deactivate' : 'Inactive, click to activate' %>"><i></i></button>
+              <span class="<%= r.active ? 'sw-on' : 'sw-off' %>"><%= r.active ? 'Active' : 'Inactive' %></span>
+            </form>
+          </td>
+          <td data-label="Actions">
+            <div class="row-actions">
+              <a class="btn ghost sm" href="/admin?edit=<%= r.id %>#onboard">Edit</a>
+              <form method="post" action="/admin/restaurants/<%= r.id %>/reset-password"
+                    data-confirm="Reset password for <%= r.name %>?" data-confirm-text="A new password is generated and shown once. The old password stops working immediately."
+                    data-confirm-ok="Reset password" data-confirm-tone="brand"><button class="ghost sm">Reset password</button></form>
+              <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
+                    data-confirm="Delete <%= r.name %>?" data-confirm-text="This permanently removes the restaurant, its owner login and all its menu items and photos. This cannot be undone."
+                    data-confirm-ok="Delete" data-confirm-tone="danger"><button class="danger sm">Delete</button></form>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+    </div>
+    <% } %>
+  </section>
 </main>
 
 <script src="/confirm.js"></script>
@@ -150,7 +152,7 @@ const wrap=document.getElementById('validwrap'),date=document.getElementById('pl
 document.querySelectorAll('input[name=plan_type]').forEach(r=>r.addEventListener('change',()=>{
   const lim=document.querySelector('input[name=plan_type]:checked').value==='limited';
   wrap.style.display=lim?'':'none';date.required=lim;if(!lim)date.value='';
-  document.getElementById('planhint').textContent=lim?'Menu stops working after this date.':'One-time plans never expire.';}));
+  document.getElementById('planhint').textContent=lim?'Menu stops working after the valid-until date.':'One-time plans never expire.';}));
 // password: generate a random one / copy it
 const pw=document.getElementById('password');
 document.getElementById('genpw').addEventListener('click',()=>{
