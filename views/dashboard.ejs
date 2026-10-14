@@ -1,73 +1,132 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dashboard · <%= r.name %></title><link rel="stylesheet" href="/style.css"></head><body>
-<div class="top noprint"><div class="wrap"><b><%= r.name %></b>
-  <div class="row"><a class="btn ghost" href="/m/<%= r.slug %>" target="_blank">View menu</a>
-  <form method="post" action="/logout"><button class="ghost">Logout</button></form></div></div></div>
+<% const hiddenCount = items.filter(i => !i.available).length; %>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard · <%= r.name %></title>
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app.css"></head><body class="app">
 
-<div class="wrap grid2">
-  <div>
-    <div class="panel qrbox">
-      <h3>Your QR code</h3>
-      <img src="/dashboard/qr.png" alt="Menu QR code">
-      <p style="font-size:.8rem;color:var(--mute);word-break:break-all"><%= base %>/m/<%= r.slug %></p>
-      <div class="row noprint" style="justify-content:center">
-        <a class="btn" href="/dashboard/qr.png?download=1">Download</a>
-        <button class="ghost" onclick="window.print()">Print</button></div>
-    </div>
+<header class="app-bar noprint"><div class="app-wrap">
+  <a class="app-brand" href="/dashboard"><i class="mark">▦</i><span><%= r.name %><small>Menu dashboard</small></span></a>
+  <div class="app-actions">
+    <a class="btn ghost" href="/m/<%= r.slug %>" target="_blank" rel="noopener">View menu ↗</a>
+    <form method="post" action="/logout"><button class="ghost">Logout</button></form>
+  </div>
+</div></header>
 
-    <div class="panel noprint">
-      <h3>Categories</h3>
-      <form method="post" action="/dashboard/categories" class="row">
-        <input name="name" placeholder="e.g. Starters" required style="flex:1"><button>Add</button></form>
-      <% categories.forEach(c => { %>
-        <div class="row" style="justify-content:space-between;margin-top:8px"><span><%= c.name %></span>
-          <form method="post" action="/dashboard/categories/<%= c.id %>/delete"
-                onsubmit="return confirm('Delete category and all its items?')"><button class="ghost danger" style="color:#fff">Delete</button></form></div>
-      <% }) %>
-    </div>
+<main class="app-wrap">
+  <div class="app-title noprint"><h1>Your menu</h1><p>Add dishes, organise categories and share your QR code.</p></div>
 
-    <form class="panel noprint" method="post" action="/dashboard/password">
-      <h3>Change password</h3>
-      <% if (ok) { %><div class="err" style="background:#d3f9d8;color:#2b8a3e"><%= ok %></div><% } %>
-      <label>Current password</label><input type="password" name="current_password" required>
-      <label>New password (min 6)</label><input type="password" name="new_password" minlength="6" required>
-      <p><button class="ghost">Update password</button></p>
-    </form>
-
-    <form class="panel noprint" method="post" action="/dashboard/items" enctype="multipart/form-data">
-      <h3><%= edit ? 'Edit item' : 'Add item' %></h3>
-      <% if (error) { %><div class="err"><%= error %></div><% } %>
-      <% if (!categories.length) { %><p style="color:var(--mute)">Create a category first.</p><% } %>
-      <% if (edit) { %><input type="hidden" name="id" value="<%= edit.id %>"><% } %>
-      <label>Name</label><input name="name" required value="<%= edit ? edit.name : '' %>">
-      <label>Description</label><textarea name="description"><%= edit ? edit.description : '' %></textarea>
-      <label>Price</label><input type="number" name="price" min="0" step="0.01" required value="<%= edit ? edit.price : '' %>">
-      <label>Category</label>
-      <select name="category_id" required>
-        <% categories.forEach(c => { %><option value="<%= c.id %>" <%= edit && edit.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
-      </select>
-      <label>Image <%= edit ? '(leave empty to keep current)' : '' %></label>
-      <input type="file" name="image" accept="image/*">
-      <p class="row"><button <%= categories.length ? '' : 'disabled' %>><%= edit ? 'Save changes' : 'Add item' %></button>
-        <% if (edit) { %><a class="btn ghost" href="/dashboard">Cancel</a><% } %></p>
-    </form>
+  <div class="stats s3 noprint">
+    <div class="stat hl"><b><%= items.length %></b><span>Menu items</span></div>
+    <div class="stat"><b><%= categories.length %></b><span>Categories</span></div>
+    <div class="stat"><b><%= hiddenCount %></b><span>Hidden from guests</span></div>
   </div>
 
-  <div class="panel noprint table-scroll" id="items">
-    <h3>Menu items (<%= items.length %>)</h3>
-    <% if (!items.length) { %><p class="empty">No items yet.</p><% } else { %>
-    <table><tr><th></th><th>Item</th><th>Category</th><th>Price</th><th></th></tr>
-    <% items.forEach(i => { %>
-      <tr style="<%= i.available ? '' : 'opacity:.5' %>">
-        <td><% if (i.image) { %><img class="thumb" src="/uploads/<%= i.image %>" alt=""><% } else { %><div class="thumb"></div><% } %></td>
-        <td><b><%= i.name %></b><br><small style="color:var(--mute)"><%= (i.description || '').slice(0, 60) %></small></td>
-        <td><%= i.category %></td><td><%= i.price %></td>
-        <td><div class="row">
-          <a class="btn ghost" href="/dashboard?edit=<%= i.id %>">Edit</a>
-          <form method="post" action="/dashboard/items/<%= i.id %>/toggle"><button class="ghost"><%= i.available ? 'Hide' : 'Show' %></button></form>
-          <form method="post" action="/dashboard/items/<%= i.id %>/delete" onsubmit="return confirm('Delete item?')"><button class="danger">Delete</button></form>
-        </div></td>
-      </tr>
-    <% }) %></table><% } %>
+  <div class="app-grid">
+    <aside class="stack sticky">
+      <section class="box qr">
+        <h2>Your QR code</h2>
+        <img src="/dashboard/qr.png" alt="Menu QR code">
+        <p class="url"><%= base %>/m/<%= r.slug %></p>
+        <div class="form-actions noprint">
+          <a class="btn" href="/dashboard/qr.png?download=1">Download</a>
+          <button class="ghost" onclick="window.print()">Print</button>
+        </div>
+      </section>
+
+      <section class="box noprint">
+        <h2>Categories <small><%= categories.length %></small></h2>
+        <form method="post" action="/dashboard/categories" class="add-row">
+          <input name="name" placeholder="e.g. Starters" required><button>Add</button></form>
+        <% if (!categories.length) { %><p class="hint" style="margin-top:12px">Start by adding a category, then add items to it.</p><% } %>
+        <div style="margin-top:10px">
+        <% categories.forEach(c => { %>
+          <div class="cat"><span><%= c.name %></span>
+            <form method="post" action="/dashboard/categories/<%= c.id %>/delete"
+                  onsubmit="return confirm('Delete this category and all its items?')"><button class="danger sm">Delete</button></form></div>
+        <% }) %>
+        </div>
+      </section>
+
+      <details class="box fold noprint" <%= ok ? 'open' : '' %>>
+        <summary>Change password</summary>
+        <form method="post" action="/dashboard/password" style="margin-top:6px">
+          <% if (ok) { %><div class="flash ok"><%= ok %></div><% } %>
+          <label for="cp">Current password</label><input id="cp" type="password" name="current_password" autocomplete="current-password" required>
+          <label for="np">New password <small style="font-weight:400;color:var(--mute)">(min 6)</small></label>
+          <input id="np" type="password" name="new_password" minlength="6" autocomplete="new-password" required>
+          <div class="form-actions"><button class="ghost">Update password</button></div>
+        </form>
+      </details>
+    </aside>
+
+    <div class="stack noprint">
+      <form class="box <%= edit ? 'edit' : '' %>" id="item-form" method="post" action="/dashboard/items" enctype="multipart/form-data">
+        <h2><%= edit ? 'Edit item' : 'Add a dish' %><% if (edit) { %><small>Editing “<%= edit.name %>”</small><% } %></h2>
+        <% if (error) { %><div class="flash err" role="alert"><%= error %></div><% } %>
+        <% if (!categories.length) { %><div class="flash err">Create a category first (left panel) before adding items.</div><% } %>
+        <% if (edit) { %><input type="hidden" name="id" value="<%= edit.id %>"><% } %>
+        <div class="two">
+          <div><label for="iname">Name</label><input id="iname" name="name" required value="<%= edit ? edit.name : '' %>"></div>
+          <div><label for="iprice">Price</label><input id="iprice" type="number" name="price" min="0" step="0.01" required value="<%= edit ? edit.price : '' %>"></div>
+        </div>
+        <label for="icat">Category</label>
+        <select id="icat" name="category_id" required>
+          <% categories.forEach(c => { %><option value="<%= c.id %>" <%= edit && edit.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+        <label for="idesc">Description</label>
+        <textarea id="idesc" name="description" placeholder="Ingredients, size, spice level…"><%= edit ? edit.description : '' %></textarea>
+        <label for="iimg">Photo <%= edit ? '(leave empty to keep current)' : '' %></label>
+        <input id="iimg" type="file" name="image" accept="image/*">
+        <img id="preview" class="preview" alt="Selected photo preview"
+             <% if (edit && edit.image) { %>src="/uploads/<%= edit.image %>" style="display:block"<% } %>>
+        <div class="form-actions">
+          <button <%= categories.length ? '' : 'disabled' %>><%= edit ? 'Save changes' : 'Add item' %></button>
+          <% if (edit) { %><a class="btn ghost" href="/dashboard">Cancel</a><% } %>
+        </div>
+      </form>
+
+      <section class="box" id="items">
+        <h2>Menu items <small><%= items.length %></small></h2>
+        <% if (!items.length) { %>
+          <div class="empty"><b>No items yet</b>Add your first dish using the form above.</div>
+        <% } else { %>
+          <div class="filters" id="filters">
+            <button type="button" class="on" data-cat="all">All</button>
+            <% categories.forEach(c => { %><button type="button" data-cat="<%= c.id %>"><%= c.name %></button><% }) %>
+          </div>
+          <div class="items">
+          <% items.forEach(i => { %>
+            <article class="item <%= i.available ? '' : 'hidden-item' %>" data-cat="<%= i.category_id %>">
+              <div class="thumbbox">
+                <% if (i.image) { %><img loading="lazy" src="/uploads/<%= i.image %>" alt="<%= i.name %>"><% } else { %><div class="noimg">🍽️</div><% } %>
+                <% if (!i.available) { %><span class="chip off">Hidden</span><% } %>
+              </div>
+              <div class="item-body">
+                <h3><%= i.name %></h3>
+                <p><%= i.description || '' %></p>
+                <div class="item-row"><span class="chip"><%= i.category %></span><span class="price"><%= i.price %></span></div>
+              </div>
+              <div class="item-actions">
+                <a class="btn ghost sm" href="/dashboard?edit=<%= i.id %>#item-form">Edit</a>
+                <form method="post" action="/dashboard/items/<%= i.id %>/toggle"><button class="ghost sm"><%= i.available ? 'Hide' : 'Show' %></button></form>
+                <form method="post" action="/dashboard/items/<%= i.id %>/delete" onsubmit="return confirm('Delete this item?')"><button class="danger sm">Delete</button></form>
+              </div>
+            </article>
+          <% }) %>
+          </div>
+        <% } %>
+      </section>
+    </div>
   </div>
-</div></body></html>
+</main>
+
+<script>
+// live preview of the chosen photo
+const file=document.getElementById('iimg'),pv=document.getElementById('preview');
+file&&file.addEventListener('change',()=>{const f=file.files[0];if(f){pv.src=URL.createObjectURL(f);pv.style.display='block';}});
+// filter the item grid by category
+const bar=document.getElementById('filters');
+bar&&bar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  bar.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.item').forEach(i=>{i.style.display=(b.dataset.cat==='all'||i.dataset.cat===b.dataset.cat)?'':'none';});});
+</script>
+</body></html>

@@ -1,36 +1,73 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin · Menu Card</title><link rel="stylesheet" href="/style.css"></head><body>
-<div class="top"><div class="wrap"><b>Menu Card · Super Admin</b>
-  <form method="post" action="/logout"><button class="ghost">Logout</button></form></div></div>
-<div class="wrap grid2">
-  <form class="panel" method="post" action="/admin/restaurants">
-    <h3>Onboard restaurant</h3>
-    <% if (error) { %><div class="err"><%= error %></div><% } %>
-    <label>Restaurant name</label><input name="name" required>
-    <label>Owner login email</label><input type="email" name="email" required>
-    <label>Initial password (min 6)</label><input name="password" minlength="6" required>
-    <label>Price paid</label><input type="number" name="price_paid" min="0" step="0.01" value="0">
-    <label>Plan valid until (optional)</label><input type="date" name="plan_expires">
-    <p><button>Create account</button></p>
-  </form>
-  <div class="panel table-scroll">
-    <h3>Restaurants (<%= rows.length %>)</h3>
-    <% if (ok) { %><div class="err" style="background:#d3f9d8;color:#2b8a3e"><%= ok %></div><% } %>
-    <% if (error && rows.length) { %><div class="err"><%= error %></div><% } %>
-    <table><tr><th>Name</th><th>Login</th><th>Paid</th><th>Until</th><th>Items</th><th>Status</th><th></th></tr>
-    <% rows.forEach(r => { %>
-      <tr>
-        <td><a href="<%= base %>/m/<%= r.slug %>" target="_blank"><%= r.name %></a></td>
-        <td><%= r.email %></td><td><%= r.price_paid %></td><td><%= r.plan_expires || '—' %></td><td><%= r.item_count %></td>
-        <td><span class="tag <%= r.active ? 'ok' : 'off' %>"><%= r.active ? 'Active' : 'Disabled' %></span></td>
-        <td><div class="row">
-          <form method="post" action="/admin/restaurants/<%= r.id %>/toggle"><button class="ghost"><%= r.active ? 'Disable' : 'Enable' %></button></form>
-          <form method="post" action="/admin/restaurants/<%= r.id %>/password" class="row">
-            <input name="password" placeholder="New password" minlength="6" style="width:130px"><button class="ghost">Reset</button></form>
-          <form method="post" action="/admin/restaurants/<%= r.id %>/delete"
-                onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger">Delete</button></form>
-        </div></td>
-      </tr>
-    <% }) %></table>
+<% const today = new Date().toISOString().slice(0, 10);
+   const activeCount = rows.filter(r => r.active).length;
+   const revenue = rows.reduce((s, r) => s + (r.price_paid || 0), 0);
+   const totalItems = rows.reduce((s, r) => s + (r.item_count || 0), 0); %>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Vigna Digital Menu</title>
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app.css"></head><body class="app">
+
+<header class="app-bar"><div class="app-wrap">
+  <a class="app-brand" href="/admin"><i class="mark">▦</i><span>Vigna Digital Menu<small>Super admin</small></span></a>
+  <div class="app-actions"><form method="post" action="/logout"><button class="ghost">Logout</button></form></div>
+</div></header>
+
+<main class="app-wrap">
+  <div class="app-title"><h1>Restaurants</h1><p>Onboard new customers and manage their accounts.</p></div>
+
+  <div class="stats">
+    <div class="stat hl"><b><%= rows.length %></b><span>Total restaurants</span></div>
+    <div class="stat"><b><%= activeCount %></b><span>Active</span></div>
+    <div class="stat"><b><%= revenue.toLocaleString() %></b><span>Total paid</span></div>
+    <div class="stat"><b><%= totalItems %></b><span>Menu items</span></div>
   </div>
-</div></body></html>
+
+  <div class="app-grid">
+    <form class="box sticky" method="post" action="/admin/restaurants">
+      <h2>Onboard restaurant</h2>
+      <% if (error) { %><div class="flash err" role="alert"><%= error %></div><% } %>
+      <label for="name">Restaurant name</label><input id="name" name="name" required>
+      <label for="email">Owner login email</label><input id="email" type="email" name="email" autocomplete="off" required>
+      <label for="password">Initial password <small style="font-weight:400;color:var(--mute)">(min 6)</small></label>
+      <input id="password" name="password" minlength="6" autocomplete="off" required>
+      <div class="two">
+        <div><label for="price_paid">Price paid</label><input id="price_paid" type="number" name="price_paid" min="0" step="0.01" value="0"></div>
+        <div><label for="plan_expires">Valid until</label><input id="plan_expires" type="date" name="plan_expires"></div>
+      </div>
+      <p class="hint" style="margin-top:8px">Leave the date empty for no expiry.</p>
+      <div class="form-actions"><button style="flex:1">Create account</button></div>
+    </form>
+
+    <section class="box">
+      <h2>All restaurants <small><%= rows.length %> total</small></h2>
+      <% if (ok) { %><div class="flash ok"><%= ok %></div><% } %>
+      <% if (!rows.length) { %>
+        <div class="empty"><b>No restaurants yet</b>Use the form to onboard your first customer.</div>
+      <% } %>
+      <% rows.forEach(r => { const expired = r.plan_expires && r.plan_expires < today; %>
+        <div class="rest">
+          <div class="avatar"><%= r.name.charAt(0) %></div>
+          <div class="rest-main">
+            <a href="/m/<%= r.slug %>" target="_blank" rel="noopener"><%= r.name %> ↗</a>
+            <p><%= r.email %></p>
+            <div class="meta">
+              <span class="chip <%= r.active ? 'ok' : 'off' %>"><%= r.active ? 'Active' : 'Disabled' %></span>
+              <% if (expired) { %><span class="chip warn">Plan expired</span><% } %>
+              <span class="chip">Paid <%= r.price_paid %></span>
+              <span class="chip">Until <%= r.plan_expires || '—' %></span>
+              <span class="chip"><%= r.item_count %> items</span>
+            </div>
+          </div>
+          <div class="rest-actions">
+            <form method="post" action="/admin/restaurants/<%= r.id %>/toggle"><button class="ghost sm"><%= r.active ? 'Disable' : 'Enable' %></button></form>
+            <details class="pw"><summary class="btn ghost sm">Reset password</summary>
+              <form method="post" action="/admin/restaurants/<%= r.id %>/password">
+                <input name="password" placeholder="New password" minlength="6" required><button class="sm">Save</button></form>
+            </details>
+            <form method="post" action="/admin/restaurants/<%= r.id %>/delete" onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger sm">Delete</button></form>
+          </div>
+        </div>
+      <% }) %>
+    </section>
+  </div>
+</main>
+</body></html>
