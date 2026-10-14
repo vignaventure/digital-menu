@@ -12,7 +12,7 @@ Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 
 ## Auth
 | Method | Path | Body |
 |---|---|---|
-| POST | `/auth/login` | `{email, password}` → `{token, expires_in, user}` |
+| POST | `/auth/login` | `{identifier, password}` where `identifier` is the user's **email or mobile number** (`email` is accepted as an alias) → `{token, expires_in, user}` |
 | GET | `/auth/me` | |
 | POST | `/auth/password` | `{current_password, new_password}` → 204 |
 
@@ -20,9 +20,9 @@ Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 
 | Method | Path | Body |
 |---|---|---|
 | GET | `/admin/restaurants` | |
-| POST | `/admin/restaurants` | `{name, email, password, price_paid?, plan_expires? (YYYY-MM-DD)}` → 201. Creates the restaurant **and** the owner login. |
+| POST | `/admin/restaurants` | `{name, mobile, email?, password, price_paid?, plan_type?, plan_expires?}` → 201. Creates the restaurant **and** the owner login. `mobile` is required (7-15 digits, optional leading `+`; spaces/dashes ignored) and is the owner's login; `email` is optional. `plan_type` is `one_time` (never expires, default) or `limited` (requires `plan_expires`, `YYYY-MM-DD`). Send `generate_password: true` instead of `password` to have one generated; it is returned once as `generated_password`. 409 if the mobile/email is already used. |
 | GET | `/admin/restaurants/:id` | |
-| PATCH | `/admin/restaurants/:id` | any of `{name, active, price_paid, plan_expires}` |
+| PATCH | `/admin/restaurants/:id` | any of `{name, active, price_paid, plan_type, plan_expires, mobile, email, password}`. `active:false` makes the restaurant inactive (menu hidden, owner locked out). `mobile`/`email`/`password` change the owner's login. |
 | POST | `/admin/restaurants/:id/password` | `{password}` → 204 (reset owner password) |
 | DELETE | `/admin/restaurants/:id` | → 204, removes all data and images |
 

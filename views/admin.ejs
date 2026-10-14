@@ -1,7 +1,13 @@
 <% const today = new Date().toISOString().slice(0, 10);
    const activeCount = rows.filter(r => r.active).length;
    const revenue = rows.reduce((s, r) => s + (r.price_paid || 0), 0);
-   const totalItems = rows.reduce((s, r) => s + (r.item_count || 0), 0); %>
+   const totalItems = rows.reduce((s, r) => s + (r.item_count || 0), 0);
+   // form values: re-filled submission > restaurant being edited > blank defaults
+   const f = form || (edit
+     ? { name: edit.name, mobile: edit.mobile || '', email: edit.email || '', price_paid: edit.price_paid,
+         plan_type: edit.plan_expires ? 'limited' : 'one_time', plan_expires: edit.plan_expires || '' }
+     : { plan_type: 'one_time', price_paid: 0 });
+   const limited = (f.plan_type || (f.plan_expires ? 'limited' : 'one_time')) === 'limited'; %>
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin · Vigna Digital Menu</title>
 <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/app.css"></head><body class="app">
@@ -21,20 +27,45 @@
     <div class="stat"><b><%= totalItems %></b><span>Menu items</span></div>
   </div>
 
-  <div class="app-grid">
-    <form class="box sticky" method="post" action="/admin/restaurants">
-      <h2>Onboard restaurant</h2>
+  <div class="app-grid admin">
+    <form class="box sticky <%= edit ? 'edit' : '' %>" method="post" action="<%= edit ? '/admin/restaurants/' + edit.id : '/admin/restaurants' %>" autocomplete="off">
+      <h2><%= edit ? 'Edit restaurant' : 'Onboard restaurant' %><% if (edit) { %><small><%= edit.name %></small><% } %></h2>
       <% if (error) { %><div class="flash err" role="alert"><%= error %></div><% } %>
-      <label for="name">Restaurant name</label><input id="name" name="name" required>
-      <label for="email">Owner login email</label><input id="email" type="email" name="email" autocomplete="off" required>
-      <label for="password">Initial password <small style="font-weight:400;color:var(--mute)">(min 6)</small></label>
-      <input id="password" name="password" minlength="6" autocomplete="off" required>
-      <div class="two">
-        <div><label for="price_paid">Price paid</label><input id="price_paid" type="number" name="price_paid" min="0" step="0.01" value="0"></div>
-        <div><label for="plan_expires">Valid until</label><input id="plan_expires" type="date" name="plan_expires"></div>
+
+      <label for="name">Restaurant name</label>
+      <input id="name" name="name" required value="<%= f.name || '' %>">
+
+      <label for="mobile">Owner mobile number <small class="req">required · used to log in</small></label>
+      <input id="mobile" type="tel" name="mobile" inputmode="tel" placeholder="e.g. 9876543210 or +919876543210" required value="<%= f.mobile || '' %>">
+
+      <label for="email">Owner email <small class="opt">optional</small></label>
+      <input id="email" type="email" name="email" placeholder="owner@restaurant.com" value="<%= f.email || '' %>">
+
+      <label for="password"><%= edit ? 'New password' : 'Password' %> <small class="opt"><%= edit ? 'leave blank to keep the current one' : 'min 6 characters' %></small></label>
+      <div class="pwrow">
+        <input id="password" name="password" minlength="6" <%= edit ? '' : 'required' %> placeholder="<%= edit ? 'Unchanged' : 'Type or generate' %>">
+        <button type="button" class="ghost sm" id="genpw">Generate</button>
+        <button type="button" class="ghost sm" id="cppw">Copy</button>
       </div>
-      <p class="hint" style="margin-top:8px">Leave the date empty for no expiry.</p>
-      <div class="form-actions"><button style="flex:1">Create account</button></div>
+
+      <label for="price_paid">Price paid</label>
+      <input id="price_paid" type="number" name="price_paid" min="0" step="0.01" value="<%= f.price_paid ?? 0 %>">
+
+      <label>Plan</label>
+      <div class="seg" role="radiogroup" aria-label="Plan type">
+        <label><input type="radio" name="plan_type" value="one_time" <%= limited ? '' : 'checked' %>><span>One time</span></label>
+        <label><input type="radio" name="plan_type" value="limited" <%= limited ? 'checked' : '' %>><span>Limited</span></label>
+      </div>
+      <div id="validwrap" style="<%= limited ? '' : 'display:none' %>">
+        <label for="plan_expires">Valid until</label>
+        <input id="plan_expires" type="date" name="plan_expires" value="<%= f.plan_expires || '' %>" <%= limited ? 'required' : '' %>>
+      </div>
+      <p class="hint" id="planhint" style="margin-top:8px"><%= limited ? 'Menu stops working after this date.' : 'One-time plans never expire.' %></p>
+
+      <div class="form-actions">
+        <button style="flex:1"><%= edit ? 'Save changes' : 'Create account' %></button>
+        <% if (edit) { %><a class="btn ghost" href="/admin">Cancel</a><% } %>
+      </div>
     </form>
 
     <section class="box">
@@ -42,32 +73,62 @@
       <% if (ok) { %><div class="flash ok"><%= ok %></div><% } %>
       <% if (!rows.length) { %>
         <div class="empty"><b>No restaurants yet</b>Use the form to onboard your first customer.</div>
+      <% } else { %>
+      <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Restaurant</th><th>Login</th><th>Plan</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+        <% rows.forEach(r => { const expired = r.plan_expires && r.plan_expires < today; %>
+          <tr class="<%= edit && edit.id === r.id ? 'sel' : '' %> <%= r.active ? '' : 'inactive' %>">
+            <td data-label="Restaurant" class="t-name">
+              <div class="avatar"><%= r.name.charAt(0) %></div>
+              <div><a href="/m/<%= r.slug %>" target="_blank" rel="noopener"><%= r.name %> ↗</a><br><small class="muted"><%= r.item_count %> items</small></div>
+            </td>
+            <td data-label="Login"><%= r.mobile || '—' %><% if (r.email) { %><br><small class="muted"><%= r.email %></small><% } %></td>
+            <td data-label="Plan">
+              <% if (!r.plan_expires) { %><span class="chip">One time</span>
+              <% } else { %><span class="chip <%= expired ? 'warn' : '' %>"><%= expired ? 'Expired ' : 'Until ' %><%= r.plan_expires %></span><% } %>
+              <br><small class="muted">Paid <%= r.price_paid %></small>
+            </td>
+            <td data-label="Status">
+              <form method="post" action="/admin/restaurants/<%= r.id %>/toggle" class="sw-form"
+                    <% if (r.active) { %>onsubmit="return confirm('Make this restaurant inactive? Its menu and owner login will stop working.')"<% } %>>
+                <button class="sw <%= r.active ? 'on' : '' %>" role="switch" aria-checked="<%= r.active %>"
+                        aria-label="<%= r.active ? 'Active, click to deactivate' : 'Inactive, click to activate' %>"><i></i></button>
+                <span class="<%= r.active ? 'sw-on' : 'sw-off' %>"><%= r.active ? 'Active' : 'Inactive' %></span>
+              </form>
+            </td>
+            <td data-label="Actions">
+              <div class="row-actions">
+                <a class="btn ghost sm" href="/admin?edit=<%= r.id %>">Edit</a>
+                <form method="post" action="/admin/restaurants/<%= r.id %>/delete" onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger sm">Delete</button></form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+      </div>
       <% } %>
-      <% rows.forEach(r => { const expired = r.plan_expires && r.plan_expires < today; %>
-        <div class="rest">
-          <div class="avatar"><%= r.name.charAt(0) %></div>
-          <div class="rest-main">
-            <a href="/m/<%= r.slug %>" target="_blank" rel="noopener"><%= r.name %> ↗</a>
-            <p><%= r.email %></p>
-            <div class="meta">
-              <span class="chip <%= r.active ? 'ok' : 'off' %>"><%= r.active ? 'Active' : 'Disabled' %></span>
-              <% if (expired) { %><span class="chip warn">Plan expired</span><% } %>
-              <span class="chip">Paid <%= r.price_paid %></span>
-              <span class="chip">Until <%= r.plan_expires || '—' %></span>
-              <span class="chip"><%= r.item_count %> items</span>
-            </div>
-          </div>
-          <div class="rest-actions">
-            <form method="post" action="/admin/restaurants/<%= r.id %>/toggle"><button class="ghost sm"><%= r.active ? 'Disable' : 'Enable' %></button></form>
-            <details class="pw"><summary class="btn ghost sm">Reset password</summary>
-              <form method="post" action="/admin/restaurants/<%= r.id %>/password">
-                <input name="password" placeholder="New password" minlength="6" required><button class="sm">Save</button></form>
-            </details>
-            <form method="post" action="/admin/restaurants/<%= r.id %>/delete" onsubmit="return confirm('Permanently delete this restaurant and all its menu data?')"><button class="danger sm">Delete</button></form>
-          </div>
-        </div>
-      <% }) %>
     </section>
   </div>
 </main>
+
+<script>
+// plan: only "Limited" shows (and requires) the valid-until date
+const wrap=document.getElementById('validwrap'),date=document.getElementById('plan_expires');
+document.querySelectorAll('input[name=plan_type]').forEach(r=>r.addEventListener('change',()=>{
+  const lim=document.querySelector('input[name=plan_type]:checked').value==='limited';
+  wrap.style.display=lim?'':'none';date.required=lim;if(!lim)date.value='';
+  document.getElementById('planhint').textContent=lim?'Menu stops working after this date.':'One-time plans never expire.';}));
+// password: generate a random one / copy it
+const pw=document.getElementById('password');
+document.getElementById('genpw').addEventListener('click',()=>{
+  const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',a=new Uint32Array(12);crypto.getRandomValues(a);
+  pw.value=Array.from(a,n=>c[n%c.length]).join('');pw.focus();pw.select();});
+document.getElementById('cppw').addEventListener('click',e=>{
+  if(!pw.value)return;pw.select();
+  (navigator.clipboard?navigator.clipboard.writeText(pw.value):Promise.reject()).catch(()=>document.execCommand('copy'));
+  e.target.textContent='Copied';setTimeout(()=>e.target.textContent='Copy',1500);});
+</script>
 </body></html>

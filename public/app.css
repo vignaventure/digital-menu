@@ -126,3 +126,57 @@ details.fold[open] summary::after{content:'–'}
   .item-actions{gap:4px;padding:0 8px 10px}
   .item-actions .sm{padding:6px 8px;font-size:.78rem}
 }
+
+/* ---- admin: form extras ---- */
+.app label small.req{color:var(--brand);font-weight:500}
+.app label small.opt{color:var(--mute);font-weight:400}
+.pwrow{display:flex;gap:6px}
+.pwrow input{flex:1;min-width:0}
+.pwrow button{flex:none}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#f1efe9;padding:4px;border-radius:11px}
+.seg label{margin:0;font-weight:600;cursor:pointer}
+.seg input{position:absolute;opacity:0;width:0;height:0}
+.seg span{display:block;text-align:center;padding:8px;border-radius:8px;font-size:.88rem;color:var(--mute)}
+.seg input:checked+span{background:#fff;color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg input:focus-visible+span{outline:2px solid var(--brand)}
+
+/* ---- admin: restaurants table ---- */
+.muted{color:var(--mute)}
+.tbl-wrap{margin:0 -4px;overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:.9rem}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr.sel{background:#fff8f3}
+.tbl tr.inactive .t-name,.tbl tr.inactive td[data-label=Login],.tbl tr.inactive td[data-label=Plan]{opacity:.55}
+.t-name{display:flex;align-items:center;gap:10px;min-width:170px}
+.t-name a{font-weight:600;color:var(--ink);text-decoration:none}
+.t-name a:hover{color:var(--brand)}
+.t-name .avatar{width:34px;height:34px;border-radius:10px;font-size:.9rem}
+.row-actions{display:flex;gap:6px;align-items:center}
+.row-actions form{margin:0}
+.sw-form{display:flex;align-items:center;gap:8px;margin:0}
+.sw{position:relative;width:42px;height:24px;padding:0;border-radius:99px;background:#ced4da;border:0;flex:none;cursor:pointer;transition:background .2s}
+.sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.sw.on{background:#2b8a3e}
+.sw.on i{transform:translateX(18px)}
+.sw-on{color:#2b8a3e;font-weight:600;font-size:.82rem}
+.sw-off{color:var(--mute);font-weight:600;font-size:.82rem}
+
+/* table becomes stacked cards on narrow screens */
+@media(max-width:820px){
+  .tbl thead{display:none}
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+  .tbl tr{border:1px solid var(--line);border-radius:12px;padding:6px 12px;margin-bottom:12px}
+  .tbl td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);text-align:right}
+  .tbl td::before{content:attr(data-label);color:var(--mute);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600;text-align:left}
+  .tbl td:last-child{border-bottom:0}
+  .tbl td.t-name{display:flex;justify-content:flex-start;min-width:0;text-align:left;font-size:1rem}
+  .tbl td.t-name::before{display:none}
+}
+
+/* admin: the 5-column table needs more room than the dashboard layout gives it */
+@media(min-width:960px) and (max-width:1179px){
+  .app-grid.admin{grid-template-columns:1fr}
+  .app-grid.admin .sticky{position:static}
+}

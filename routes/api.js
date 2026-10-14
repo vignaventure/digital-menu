@@ -41,7 +41,7 @@ router.get('/public/menu/:slug', (req, res) => {
 
 // ---- auth ----
 router.post('/auth/login', loginLimiter, (req, res) => {
-  const u = svc.authenticate(req.body.email, req.body.password);
+  const u = svc.authenticate(req.body.identifier ?? req.body.email, req.body.password); // identifier = email or mobile
   res.json({ token: sign({ uid: u.id }, SESSION_SECRET), expires_in: 12 * 3600, user: svc.publicUser(u) });
 });
 router.get('/auth/me', auth(), (req, res) => res.json({ user: svc.publicUser(req.user) }));

@@ -27,7 +27,7 @@ router.get('/', (req, res) => res.render('landing', { contact: process.env.CONTA
 router.get('/login', (req, res) => res.render('login', { error: null }));
 router.post('/login', loginLimiter, (req, res, next) => {
   let u;
-  try { u = svc.authenticate(req.body.email, req.body.password); }
+  try { u = svc.authenticate(req.body.identifier ?? req.body.email, req.body.password); }
   catch (e) { return e instanceof svc.HttpError ? res.status(e.status).render('login', { error: e.message }) : next(e); }
   req.session.regenerate(err => {
     if (err) return next(err);
@@ -38,18 +38,37 @@ router.post('/login', loginLimiter, (req, res, next) => {
 router.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 
 // ---------- Super admin ----------
-router.get('/admin', need('admin'), (req, res) =>
-  res.render('admin', { rows: svc.listRestaurants(), error: req.query.error, ok: req.query.ok, base: BASE_URL }));
+// `form` re-fills the form after a validation error; `editId` switches the form to edit mode.
+function adminPage(req, res, { status = 200, error, ok, editId = req.query.edit, form } = {}) {
+  let edit = null;
+  if (editId) try { edit = svc.getRestaurant(Number(editId)); } catch {}
+  res.status(status).render('admin', {
+    rows: svc.listRestaurants(), edit, form: form || null,
+    error: error ?? req.query.error, ok: ok ?? req.query.ok, base: BASE_URL,
+  });
+}
+function fail(req, res, e, extra) {
+  if (!(e instanceof svc.HttpError)) throw e;
+  adminPage(req, res, { status: e.status, error: e.message, ...extra });
+}
+
+router.get('/admin', need('admin'), (req, res) => adminPage(req, res));
 router.post('/admin/restaurants', need('admin'), (req, res) => {
-  try { svc.createRestaurant(req.body); res.redirect('/admin'); }
-  catch (e) { res.redirect('/admin?error=' + msg(e)); }
+  try {
+    svc.createRestaurant(req.body);
+    res.redirect('/admin?ok=' + encodeURIComponent(`Restaurant created. Owner can log in with ${req.body.mobile}.`));
+  } catch (e) { fail(req, res, e, { form: req.body }); }
+});
+router.post('/admin/restaurants/:id', need('admin'), (req, res) => {
+  try {
+    const b = { ...req.body };
+    if (!b.password) delete b.password; // blank = keep current password
+    svc.updateRestaurant(Number(req.params.id), b);
+    res.redirect('/admin?ok=Changes+saved');
+  } catch (e) { fail(req, res, e, { editId: req.params.id, form: req.body }); }
 });
 router.post('/admin/restaurants/:id/toggle', need('admin'), (req, res) => {
   svc.toggleRestaurant(req.params.id); res.redirect('/admin');
-});
-router.post('/admin/restaurants/:id/password', need('admin'), (req, res) => {
-  try { svc.resetOwnerPassword(req.params.id, req.body.password); res.redirect('/admin?ok=Password+updated'); }
-  catch (e) { res.redirect('/admin?error=' + msg(e)); }
 });
 router.post('/admin/restaurants/:id/delete', need('admin'), (req, res) => {
   try { svc.deleteRestaurant(req.params.id); res.redirect('/admin?ok=Restaurant+deleted'); }
