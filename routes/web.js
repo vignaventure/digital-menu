@@ -23,7 +23,7 @@ const need = role => (req, res, next) => {
 };
 
 // ---------- Auth ----------
-router.get('/', (req, res) => res.redirect('/login'));
+router.get('/', (req, res) => res.render('landing', { contact: process.env.CONTACT_EMAIL || '' }));
 router.get('/login', (req, res) => res.render('login', { error: null }));
 router.post('/login', loginLimiter, (req, res, next) => {
   let u;

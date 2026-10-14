@@ -28,6 +28,12 @@ const login = async (email, password) => (await call('POST', '/api/v1/auth/login
 // 1x1 transparent GIF
 const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 
+test('landing page is served at /', async () => {
+  const r = await fetch(base + '/');
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /one <span>scan<\/span> away/);
+});
+
 test('health check', async () => {
   const r = await call('GET', '/health');
   assert.equal(r.status, 200);

@@ -1,0 +1,89 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vigna Digital Menu · QR menus for restaurants</title>
+<meta name="description" content="Give your restaurant a digital menu. Guests scan a QR code and browse your full menu with photos and prices on their phone.">
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/landing.css"></head><body class="lp">
+
+<header class="lp-nav"><div class="lp-wrap">
+  <a class="lp-logo" href="/"><span class="lp-mark">▦</span> Vigna Digital <b>Menu</b></a>
+  <nav>
+    <a class="lp-link" href="#how">How it works</a>
+    <a class="lp-link" href="#features">Features</a>
+    <a class="btn" href="/login">Login</a>
+  </nav>
+</div></header>
+
+<section class="lp-hero"><div class="lp-wrap lp-hero-grid">
+  <div>
+    <p class="lp-eyebrow">Digital menus for restaurants</p>
+    <h1>Your whole menu,<br>one <span>scan</span> away.</h1>
+    <p class="lp-lead">Guests point their phone at a QR code on the table and see your menu as beautiful photo cards. You update dishes and prices in seconds, with no reprinting.</p>
+    <div class="lp-cta">
+      <a class="btn lp-big" href="/login">Restaurant login</a>
+      <% if (contact) { %><a class="btn ghost lp-big" href="mailto:<%= contact %>?subject=Digital%20menu%20for%20my%20restaurant">Get your menu</a><% } %>
+    </div>
+  </div>
+
+  <div class="lp-visual" aria-hidden="true">
+    <div class="lp-phone">
+      <div class="lp-notch"></div>
+      <div class="lp-phone-head">Your Restaurant</div>
+      <div class="lp-chips"><span class="on">Starters</span><span>Mains</span><span>Desserts</span></div>
+      <div class="lp-cards">
+        <div><i style="--c:#ffd8a8">🍕</i><b>Margherita</b><em>12.00</em></div>
+        <div><i style="--c:#ffc9c9">🍔</i><b>Smash Burger</b><em>9.50</em></div>
+        <div><i style="--c:#c3fae8">🥗</i><b>Garden Salad</b><em>7.00</em></div>
+        <div><i style="--c:#eebefa">🍰</i><b>Cheesecake</b><em>6.50</em></div>
+      </div>
+    </div>
+    <div class="lp-qr">
+      <svg viewBox="0 0 29 29" width="84" height="84" shape-rendering="crispEdges">
+        <rect width="29" height="29" fill="#fff"/>
+        <g fill="#1d1d1f">
+          <path d="M2 2h7v7H2zM20 2h7v7h-7zM2 20h7v7H2z"/>
+          <g fill="#fff"><path d="M3 3h5v5H3zM21 3h5v5h-5zM3 21h5v5H3z"/></g>
+          <path d="M4 4h3v3H4zM22 4h3v3h-3zM4 22h3v3H4z"/>
+          <path d="M11 2h2v2h-2zM14 4h3v2h-3zM11 7h2v2h-2zM16 8h2v3h-2zM11 11h3v2h-3zM2 11h2v2H2zM6 12h3v2H6zM2 15h3v2H2zM8 16h2v3H8zM12 14h2v3h-2zM15 12h3v2h-3zM20 11h2v3h-2zM24 12h3v2h-3zM19 16h3v2h-3zM24 16h2v3h-2zM12 19h3v2h-3zM17 20h2v3h-2zM21 20h3v2h-3zM25 22h2v3h-2zM13 24h3v3h-3zM20 25h3v2h-3z"/>
+        </g>
+      </svg>
+      <span>Scan for menu</span>
+    </div>
+  </div>
+</div></section>
+
+<section id="how" class="lp-sec"><div class="lp-wrap">
+  <h2>Up and running in three steps</h2>
+  <div class="lp-steps">
+    <div><span class="lp-num">1</span><h3>We set you up</h3><p>Sign up and get your own dashboard login. Your restaurant gets a private menu page right away.</p></div>
+    <div><span class="lp-num">2</span><h3>Add your dishes</h3><p>Create categories, then add each item with a photo, name, description and price.</p></div>
+    <div><span class="lp-num">3</span><h3>Print the QR code</h3><p>Download your QR code from the dashboard and place it on tables, counters or flyers.</p></div>
+  </div>
+</div></section>
+
+<section id="features" class="lp-sec lp-alt"><div class="lp-wrap">
+  <h2>Everything a menu needs</h2>
+  <div class="lp-feats">
+    <div><b>📱 Made for phones</b><p>A fast, thumb-friendly card grid that works on any screen, with no app to install.</p></div>
+    <div><b>🖼️ Photo cards</b><p>Show off your dishes with images, descriptions and prices, grouped by category.</p></div>
+    <div><b>⚡ Instant updates</b><p>Change a price or hide a sold-out dish and every guest sees it immediately.</p></div>
+    <div><b>🔳 Your own QR code</b><p>Download or print a high-resolution QR code that always points to your latest menu.</p></div>
+    <div><b>🔒 Your own login</b><p>A private web dashboard for your team to manage the menu, from any browser.</p></div>
+    <div><b>🧾 Tidy by category</b><p>Starters, mains, drinks, desserts: guests jump straight to what they want.</p></div>
+  </div>
+</div></section>
+
+<section class="lp-sec"><div class="lp-wrap">
+  <div class="lp-banner">
+    <div><h2>Ready to go digital?</h2><p>Already a customer? Sign in to manage your menu.</p></div>
+    <div class="lp-cta">
+      <a class="btn lp-big lp-inv" href="/login">Login</a>
+      <% if (contact) { %><a class="btn lp-big lp-outline" href="mailto:<%= contact %>?subject=Digital%20menu%20for%20my%20restaurant">Contact us</a><% } %>
+    </div>
+  </div>
+</div></section>
+
+<footer class="lp-foot"><div class="lp-wrap">
+  <span>© <%= new Date().getFullYear() %> Vigna Digital</span>
+  <a href="/login">Restaurant login</a>
+</div></footer>
+</body></html>
