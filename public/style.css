@@ -171,3 +171,11 @@ main.main.wide table { font-size: 13px; }
 main.main.wide th, main.main.wide td { padding-right: 10px; }
 main.main.wide td .sm { padding: 5px 9px; font-size: 12px; }
 main.main.wide .actions { gap: 6px; }
+
+/* form grids: every field in a row lines up (same label height, same control height, spacing from the grid gap) */
+.row { gap: 14px 16px; }
+.row > div { min-width: 0; }
+.row > div > label:first-child { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+input:not([type=checkbox]):not([type=color]):not([type=file]), select { min-height: 44px; }
+.pw-row { align-items: stretch; }
+input[type=date] { height: 44px; }
