@@ -23,6 +23,9 @@ The app is one Node process + SQLite file + uploaded images, all stored under `D
 
 **Required env in production** (the app refuses to start without them): `SESSION_SECRET` (≥32 chars, `openssl rand -hex 32`), `BASE_URL` (public https URL, **baked into QR codes — set it before printing any**), and on first run `ADMIN_EMAIL` + `ADMIN_PASSWORD` (≥8 chars). See [.env.example](.env.example).
 
+### Any server, any project
+[docs/SERVER-STANDARD-SETUP.md](docs/SERVER-STANDARD-SETUP.md) is the reusable runbook (one-time server setup, per-project checklist, and a project-config template with this project filled in).
+
 ### Ubuntu server (no Docker)
 See [docs/DEPLOY-UBUNTU.md](docs/DEPLOY-UBUNTU.md): Node + systemd + Caddy HTTPS, backups, updates.
 
