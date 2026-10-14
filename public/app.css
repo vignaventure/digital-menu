@@ -216,4 +216,36 @@ details.onboard form{margin-top:14px;padding-top:6px;border-top:1px solid var(--
 .fgrid{display:grid;gap:0 18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .fgrid .f{min-width:0}
 .tablebox{padding:20px 22px}
-.t-email{color:var(--mute);word-break:break-all}
+.t-email{color:var(--mute);min-width:170px;word-break:normal}
+.row-actions{white-space:nowrap}
+.row-actions .sm{white-space:nowrap}
+
+/* ---- top-bar CTA ---- */
+.app-actions .cta{padding:9px 16px}
+.show-sm{display:none}
+@media(max-width:560px){.hide-sm{display:none}.show-sm{display:inline}}
+
+/* ---- onboarding popup (native <dialog>) ---- */
+dialog.formdlg{border:0;border-radius:18px;padding:0;width:min(700px,calc(100% - 24px));max-height:calc(100vh - 32px);overflow:hidden;
+  background:#fff;color:var(--ink);box-shadow:0 30px 70px -20px rgba(0,0,0,.45)}
+dialog.formdlg[open]{display:flex;flex-direction:column;animation:mpop .18s ease-out}
+dialog.formdlg::backdrop{background:rgba(29,29,31,.5);backdrop-filter:blur(3px)}
+dialog.formdlg form{display:flex;flex-direction:column;min-height:0;flex:1}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+.dlg-head h2{margin:0;font-size:1.15rem;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dlg-head h2 small{color:var(--mute);font-weight:500;font-size:.85rem}
+.dlg-x{width:34px;height:34px;padding:0;flex:none}
+.dlg-body{padding:6px 22px 8px;overflow-y:auto;flex:1}
+.dlg-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid var(--line);background:#faf9f7}
+@media(max-width:560px){.dlg-foot button{flex:1}}
+@media(prefers-reduced-motion:reduce){dialog.formdlg[open]{animation:none}}
+
+/* ---- password column ---- */
+.t-pw{white-space:nowrap}
+.pwtxt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;font-size:.88rem;color:var(--mute);user-select:none}
+.pwtxt.shown{color:var(--ink);font-weight:600;user-select:all}
+.app .eye{background:none;border:0;color:var(--mute);padding:5px;margin-left:4px;border-radius:8px;vertical-align:middle;cursor:pointer;line-height:0}
+.app .eye:hover{background:#f1efe9;color:var(--ink);filter:none}
+.eye.on{color:var(--brand)}
+.eye .i-eyeoff,.eye.on .i-eye{display:none}
+.eye.on .i-eyeoff{display:inline}

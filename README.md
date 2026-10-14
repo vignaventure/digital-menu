@@ -43,5 +43,6 @@ Deploy from this repo using the `Dockerfile`; attach a persistent disk/volume mo
 Back up `DATA_DIR` (`app.db` plus `uploads/`). With the app stopped, or using `sqlite3 app.db ".backup out.db"`, copy it somewhere safe on a schedule.
 
 ## Notes
+- **Viewing owner passwords:** login uses a bcrypt hash. Separately, the password the super admin *set* for an owner is kept encrypted (AES-256-GCM, key derived from `SESSION_SECRET`) so the admin can view it with the eye button. It is cleared when the owner changes their own password. **Do not change `SESSION_SECRET` casually**: stored copies become unreadable (show "Not available") until reset; logins keep working. Anyone with the database *and* `SESSION_SECRET` can decrypt them, so protect both.
 - Single instance only (SQLite). Scale vertically; move to Postgres + object storage if you need multiple instances.
 - Disabling a restaurant or letting `plan_expires` pass hides its menu; disabling also locks the owner out immediately.

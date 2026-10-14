@@ -26,6 +26,7 @@ test('legacy users table is migrated and keeps its rows', () => {
   const { db } = require('../lib/db');
   const cols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
   assert.ok(cols.includes('mobile'));
+  assert.ok(cols.includes('password_enc'));
   const rows = db.prepare('SELECT id,email,mobile,role,restaurant_id FROM users ORDER BY id').all();
   assert.equal(rows.length, 2);
   assert.equal(rows[1].email, 'old@cafe.com');

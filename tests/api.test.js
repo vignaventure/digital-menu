@@ -6,6 +6,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'menucard-test-'));
 process.env.ADMIN_EMAIL = 'admin@test.com';
 process.env.ADMIN_PASSWORD = 'AdminPass123';
 process.env.BASE_URL = 'http://test.local';
+process.env.LOGIN_RATE_LIMIT = '10000'; // tests log in far more often than the real limit (20 per 15 min)
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -184,7 +185,7 @@ test('web login + dashboard pages render', async () => {
   const cookie = res.headers.get('set-cookie').split(';')[0];
   const page = await fetch(base + '/admin', { headers: { cookie } });
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Onboard new restaurant/);
+  assert.match(await page.text(), /Onboard restaurant/);
   assert.equal((await fetch(base + '/admin', { redirect: 'manual' })).status, 302);
 });
 
@@ -237,4 +238,48 @@ test('one-time login details after create and reset; hash never exposed', async 
   // API responses never include the hash
   const admin = await login('admin@test.com', 'AdminPass123');
   assert.ok(!JSON.stringify((await call('GET', '/api/v1/admin/restaurants', { token: admin })).body).includes('password_hash'));
+});
+
+test('super admin can view the password it set (stored encrypted); owner changes clear it', async () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const adminLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=admin@test.com&password=AdminPass123' });
+  const cookie = adminLogin.headers.get('set-cookie').split(';')[0];
+  const admin = await login('admin@test.com', 'AdminPass123');
+  const reveal = (id, c = cookie) => fetch(base + `/admin/restaurants/${id}/reveal-password`, { method: 'POST', redirect: 'manual', headers: { cookie: c } });
+
+  const r = await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Vault Cafe', mobile: '9000000055', password: 'Vault#Pass1' } });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const ok = await reveal(r.body.id);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('cache-control'), 'no-store');
+  assert.equal((await ok.json()).password, 'Vault#Pass1');
+
+  // stored encrypted, never as plain text
+  const raw = new DatabaseSync(path.join(process.env.DATA_DIR, 'app.db'), { readOnly: true });
+  const row = raw.prepare("SELECT password_hash, password_enc FROM users WHERE mobile='9000000055'").get();
+  raw.close();
+  assert.ok(row.password_enc && !row.password_enc.includes('Vault#Pass1'));
+  assert.ok(row.password_hash.startsWith('$2'));
+
+  // admin-only: not available to anonymous users or restaurant owners
+  assert.equal((await fetch(base + `/admin/restaurants/${r.body.id}/reveal-password`, { method: 'POST', redirect: 'manual' })).status, 302);
+  const ownerLogin = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'identifier=9000000055&password=Vault%23Pass1' });
+  assert.equal((await reveal(r.body.id, ownerLogin.headers.get('set-cookie').split(';')[0])).status, 302);
+
+  // admin edit with a new password updates what is shown
+  await call('PATCH', `/api/v1/admin/restaurants/${r.body.id}`, { token: admin, json: { password: 'Second#Pass2' } });
+  assert.equal((await (await reveal(r.body.id)).json()).password, 'Second#Pass2');
+
+  // once the owner picks their own password the admin copy is cleared (it would be stale)
+  const owner = await login('9000000055', 'Second#Pass2');
+  assert.equal((await call('POST', '/api/v1/auth/password', { token: owner, json: { current_password: 'Second#Pass2', new_password: 'OwnerChose3' } })).status, 204);
+  assert.equal((await (await reveal(r.body.id)).json()).password, null);
+  assert.ok(!(await (await fetch(base + '/admin', { headers: { cookie } })).text()).includes('OwnerChose3'));
+
+  // the page never embeds passwords; the eye only shows for restaurants with a stored copy
+  const r2 = await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Eye Cafe', mobile: '9000000056', password: 'Eye#Pass44' } });
+  const html = await (await fetch(base + '/admin', { headers: { cookie } })).text();
+  assert.ok(!html.includes('Eye#Pass44'));
+  assert.match(html, new RegExp(`id="pw-${r2.body.id}"`));
+  assert.doesNotMatch(html, new RegExp(`id="pw-${r.body.id}"`));
 });

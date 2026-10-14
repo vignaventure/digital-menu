@@ -7,7 +7,7 @@ const { upload } = require('../lib/uploads');
 const svc = require('../lib/service');
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 20, standardHeaders: true, legacyHeaders: false,
   handler: (req, res) => res.status(429).render('login', { error: 'Too many attempts. Try again in 15 minutes.' }),
 });
 const msg = e => encodeURIComponent(e instanceof svc.HttpError ? e.message : 'Something went wrong');
@@ -39,14 +39,14 @@ router.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/lo
 
 // ---------- Super admin ----------
 // `form` re-fills the form after a validation error; `editId` switches the form to edit mode.
-function adminPage(req, res, { status = 200, error, ok, editId = req.query.edit, form } = {}) {
+function adminPage(req, res, { status = 200, error, ok, editId = req.query.edit, form, openForm = !!req.query.new } = {}) {
   let edit = null;
   if (editId) try { edit = svc.getRestaurant(Number(editId)); } catch {}
   // one-time login details (set after create / password change); shown once, then discarded
   const credentials = req.session.credentials || null;
   delete req.session.credentials;
   res.status(status).render('admin', {
-    rows: svc.listRestaurants(), edit, form: form || null, credentials,
+    rows: svc.listRestaurants(), edit, form: form || null, credentials, openForm,
     error: error ?? req.query.error, ok: ok ?? req.query.ok, base: BASE_URL,
   });
 }
@@ -83,6 +83,13 @@ router.post('/admin/restaurants/:id/reset-password', need('admin'), (req, res) =
     req.session.credentials = { title: 'New password generated', name: r.name, mobile: r.mobile, email: r.email, password };
     res.redirect('/admin');
   } catch (e) { res.redirect('/admin?error=' + msg(e)); }
+});
+// Super admin clicked the eye: return the password they set for this owner (JSON, POST-only).
+router.post('/admin/restaurants/:id/reveal-password', need('admin'), (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ password: svc.revealOwnerPassword(Number(req.params.id)) });
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 router.post('/admin/restaurants/:id/delete', need('admin'), (req, res) => {
   try { svc.deleteRestaurant(req.params.id); res.redirect('/admin?ok=Restaurant+deleted'); }

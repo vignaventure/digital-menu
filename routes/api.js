@@ -11,7 +11,7 @@ const router = express.Router();
 router.use(express.json({ limit: '100kb' }));
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 20, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many attempts. Try again in 15 minutes.' },
 });
 
