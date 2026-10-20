@@ -9,7 +9,7 @@ window.MenuManager = (() => {
       <div class="stats" data-stats></div>
       <div class="toolbar">
         <div class="filters"><input type="search" data-q placeholder="Search items…" aria-label="Search items"><select data-cat aria-label="Filter by category"><option value="">All categories</option></select></div>
-        <div class="actions"><button class="ghost" data-cats>${ico('tag')} Categories</button><button data-add>${ico('plus')} Add item</button></div>
+        <div class="actions"><div data-view></div><button class="ghost" data-cats>${ico('tag')} Categories</button><button data-add>${ico('plus')} Add item</button></div>
       </div>
       <div class="items" data-list></div>`;
 
@@ -123,6 +123,8 @@ window.MenuManager = (() => {
         else if (await confirmDialog({ title: 'Delete this item?', message: `"${i.name}" will be removed from the menu. This can't be undone.`, confirmText: 'Delete item', danger: true })) { await api(`${base}/items/${i.id}`, 'DELETE'); await changed(); toast('Item deleted'); }
       } catch (er) { toast(er.message); }
     });
+
+    viewToggle(q('[data-view]'), 'dm_view_items', (m) => q('[data-list]').classList.toggle('as-list', m === 'list')); // same preference as the restaurant dashboard
 
     return reload().then(() => ({ reload }));
   }

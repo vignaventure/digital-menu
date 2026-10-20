@@ -64,10 +64,11 @@ function openItem(id) {
   $('#themeMeta').content = r.theme_color;
   $('#app').innerHTML = `
     <header class="m-hero">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<h1>${esc(r.name)}</h1>${r.tagline ? `<p>${esc(r.tagline)}</p>` : ''}${r.city ? `<div class="small">${esc(r.city)}</div>` : ''}</header>
-    <div class="m-bar"><div class="m-search"><input type="search" id="q" placeholder="Search dishes" aria-label="Search dishes" autocomplete="off"></div><div class="m-chips" id="chips" role="tablist"></div></div>
+    <div class="m-bar"><div class="m-search"><input type="search" id="q" placeholder="Search dishes" aria-label="Search dishes" autocomplete="off"><div id="layout"></div></div><div class="m-chips" id="chips" role="tablist"></div></div>
     <main class="m-wrap" id="sections"></main>
     <footer class="m-foot">${r.address ? esc(r.address) + '<br>' : ''}${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : ''}</footer>`;
   render();
+  viewToggle($('#layout'), 'dm_view_menu', (m) => $('#sections').classList.toggle('as-list', m === 'list')); // guests pick grid or list; remembered on their phone
   addEventListener('scroll', () => { // at the very bottom of a short menu, highlight the last category
     if (Date.now() > lockUntil && innerHeight + scrollY >= document.documentElement.scrollHeight - 4) { const last = [...document.querySelectorAll('.m-sec')].pop(); if (last) setActive(last.dataset.cat, false); }
   }, { passive: true });

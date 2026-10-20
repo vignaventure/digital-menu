@@ -94,12 +94,29 @@ const genPassword = () => {
   return Array.from(a, (n) => chars[n % chars.length]).join('');
 };
 
+// Grid / list switch (two icon buttons). Remembers the choice on this device under `key`.
+// apply('grid' | 'list') is called straight away and on every change.
+function viewToggle(root, key, apply) {
+  let mode = 'grid';
+  try { mode = localStorage.getItem(key) === 'list' ? 'list' : 'grid'; } catch {}
+  root.classList.add('vtoggle'); root.setAttribute('role', 'group'); root.setAttribute('aria-label', 'Layout');
+  root.innerHTML = `<button type="button" data-layout="grid" aria-label="Grid view" title="Grid view">${ico('grid')}</button><button type="button" data-layout="list" aria-label="List view" title="List view">${ico('list')}</button>`;
+  const set = (m) => {
+    mode = m; try { localStorage.setItem(key, m); } catch {}
+    root.querySelectorAll('button').forEach((b) => { const on = b.dataset.layout === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    apply(m);
+  };
+  root.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => set(b.dataset.layout)));
+  set(mode);
+}
+
 const ICONS = {
   menu: '<path d="M4 6h16M4 12h16M4 18h10"/>', tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>', list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4"/>',
   store: '<path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>', plus: '<path d="M12 5v14M5 12h14"/>', key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2M16 7l3 3M14 9l2 2"/>',
   logout: '<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>', check: '<path d="M20 6L9 17l-5-5"/>', trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>', home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff: '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"/>',
 };

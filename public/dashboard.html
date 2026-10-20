@@ -25,7 +25,7 @@
         <input type="search" id="iSearch" placeholder="Search items…" aria-label="Search items">
         <select id="iCat" aria-label="Filter by category"><option value="">All categories</option></select>
       </div>
-      <button id="addItem" data-ico="plus">Add item</button>
+      <div class="actions"><div id="itemView"></div><button id="addItem" data-ico="plus">Add item</button></div>
     </div>
     <div id="itemList" class="items"></div>
   </section>
@@ -247,6 +247,8 @@ $('#pwf').addEventListener('submit', async (e) => {
   if (f.new_password !== f.confirm_password) { $('#pwErr').textContent = 'New passwords do not match'; return; }
   try { await api('/api/v1/auth/password', 'POST', f); e.target.reset(); toast('Password updated'); } catch (er) { $('#pwErr').textContent = er.message; }
 });
+
+viewToggle($('#itemView'), 'dm_view_items', (m) => $('#itemList').classList.toggle('as-list', m === 'list'));
 
 let showTab;
 (async () => {
