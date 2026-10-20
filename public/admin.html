@@ -30,6 +30,11 @@
     </div>
   </section>
 
+  <section data-panel="menu">
+    <div class="card" id="menuHead"></div>
+    <div id="menuMount"></div>
+  </section>
+
   <section data-panel="onboard">
     <form id="obForm" class="card" autocomplete="off">
       <h3>Restaurant details</h3>
@@ -66,6 +71,7 @@
 </main>
 </div>
 <script src="/app.js"></script>
+<script src="/menu-manager.js"></script>
 <script>
 let restaurants = [], showTab;
 const today = new Date().toISOString().slice(0, 10);
@@ -90,7 +96,7 @@ function render() {
       <td>${planPill(r)}</td><td>${money(r.price_paid)}</td>
       <td>${r.paid ? '<span class="pill ok">Paid</span>' : '<span class="pill warn">Pending</span>'}</td><td>${r.item_count}</td>
       <td>${r.active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Inactive</span>'}</td>
-      <td><div class="actions" style="flex-wrap:nowrap"><button class="sm ghost" data-view="${r.id}">View</button><button class="sm" data-edit="${r.id}">Edit</button>
+      <td><div class="actions" style="flex-wrap:nowrap"><button class="sm" data-menu="${r.id}">Manage menu</button><button class="sm ghost" data-view="${r.id}">View</button><button class="sm ghost" data-edit="${r.id}">Edit</button>
         <button class="sm ghost" data-reset="${r.id}">Reset password</button><button class="sm ${r.active ? 'danger' : 'ghost'}" data-toggle="${r.id}">${r.active ? 'Deactivate' : 'Activate'}</button><button class="sm danger" data-del="${r.id}">Delete</button></div></td></tr>`).join('')
   }</tbody></table>` : `<p class="empty">${restaurants.length ? 'No restaurants match your search or filter.' : 'No restaurants yet. Use “Onboard restaurant” to add the first one.'}</p>`;
 }
@@ -114,14 +120,35 @@ const planToggle = (scope) => {
 const wireGenerate = (scope) => $('[data-genpw]', scope).addEventListener('click', () => { const i = $('[name=password]', scope); i.value = genPassword(); i.focus(); i.select(); });
 planToggle($('#obForm')); wireGenerate($('#obForm'));
 
+// "Manage menu": edit a restaurant's categories, dishes and photos on its behalf (a panel, not a sidebar tab)
+function openMenu(r) {
+  document.querySelectorAll('[data-panel]').forEach((p) => p.classList.toggle('hidden', p.dataset.panel !== 'menu'));
+  document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === 'restaurants'));
+  $('#pageTitle').textContent = `Menu · ${r.name}`;
+  $('#pageSub').textContent = 'Add and edit this restaurant\'s dishes. Changes appear on the guest menu straight away.';
+  $('#menuHead').innerHTML = `<div class="toolbar" style="margin:0">
+    <div class="actions"><button class="ghost" data-backlist>← All restaurants</button>
+      <b>${esc(r.name)}</b> ${r.active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Inactive: guests cannot see this menu</span>'}</div>
+    <a class="btn ghost" href="${esc(r.menu_url)}" target="_blank" rel="noopener">Open guest menu ↗</a></div>
+    <div class="note" style="margin-bottom:0">You are editing this menu on behalf of ${esc(r.owner || r.name)}. The restaurant sees these changes in its own dashboard.</div>`;
+  $('#menuHead [data-backlist]').addEventListener('click', () => showTab('restaurants'));
+  $('#menuMount').innerHTML = '<p class="muted">Loading…</p>';
+  history.replaceState(null, '', '#menu-' + r.id);
+  scrollTo(0, 0);
+  MenuManager.mount($('#menuMount'), { base: `/api/v1/admin/restaurants/${r.id}`, themeColor: r.theme_color, onChange: load })
+    .catch((er) => { $('#menuMount').innerHTML = `<p class="err">${esc(er.message)}</p>`; });
+}
+
 // hide a revealed password again
 function hidePw(b) { const t = document.querySelector(`[data-pwtxt="${b.dataset.eye}"]`); t.textContent = '••••••••'; t.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', 'Show password'); b.innerHTML = ico('eye'); clearTimeout(b._t); }
 
 document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#rList')) return; // only the restaurants table's buttons (the menu editor has its own handlers)
   const id = (k) => e.target.closest(`[data-${k}]`)?.dataset[k];
   const get = (v) => restaurants.find((r) => r.id == v);
   try {
-    if (id('eye')) {
+    if (id('menu')) { openMenu(get(id('menu'))); }
+    else if (id('eye')) {
       const b = e.target.closest('[data-eye]');
       if (b.getAttribute('aria-pressed') === 'true') return hidePw(b);
       const t = document.querySelector(`[data-pwtxt="${b.dataset.eye}"]`); b.disabled = true;
@@ -188,6 +215,12 @@ $('#pwf').addEventListener('submit', async (e) => {
   try { await api('/api/v1/auth/password', 'POST', f); e.target.reset(); toast('Password updated'); } catch (er) { $('#pwErr').textContent = er.message; }
 });
 
-(async () => { await requireRole('admin'); await load(); showTab = tabs($('#tabs')); })();
+(async () => {
+  await requireRole('admin'); await load();
+  const deep = /^#menu-(\d+)$/.exec(location.hash); // read before the tabs reset the address: a reload keeps you on the same menu
+  showTab = tabs($('#tabs'), () => { if (location.hash.startsWith('#menu-')) history.replaceState(null, '', location.pathname); });
+  const r = deep && restaurants.find((x) => x.id == deep[1]);
+  if (r) openMenu(r);
+})();
 </script>
 </body></html>

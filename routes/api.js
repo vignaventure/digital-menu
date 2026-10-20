@@ -91,6 +91,29 @@ router.post('/auth/password', auth(), async (req, res) => {
   res.status(204).end();
 });
 
+// Categories and items: the same operations for an owner (their own restaurant) and for the admin (any restaurant,
+// under /admin/restaurants/:id). `restaurantOf(req)` says which restaurant the request is about.
+function menuRoutes(r, restaurantOf) {
+  const ref = req => Number(req.params.ref);
+  r.get('/categories', async (req, res) => res.json({ categories: await svc.listCategories(restaurantOf(req)) }));
+  r.post('/categories', async (req, res) => res.status(201).json(await svc.createCategory(restaurantOf(req), req.body.name)));
+  r.put('/categories/:ref', async (req, res) => res.json(await svc.renameCategory(restaurantOf(req), ref(req), req.body.name)));
+  r.delete('/categories/:ref', async (req, res) => { await svc.deleteCategory(restaurantOf(req), ref(req)); res.status(204).end(); });
+
+  // Items accept JSON (photo as a data URL) or multipart/form-data (field "image").
+  r.get('/items', async (req, res) => res.json({ items: (await svc.listItems(restaurantOf(req), Number(req.query.category_id) || null)).map(svc.itemOut) }));
+  r.post('/items', upload.single('image'), async (req, res) =>
+    res.status(201).json(svc.itemOut(await svc.saveItem(restaurantOf(req), req.body, photo(req)))));
+  r.get('/items/:ref', async (req, res) => res.json(svc.itemOut(await svc.getItem(restaurantOf(req), ref(req)))));
+  r.put('/items/:ref', upload.single('image'), async (req, res) =>
+    res.json(svc.itemOut(await svc.saveItem(restaurantOf(req), { ...req.body, id: ref(req) }, photo(req)))));
+  r.patch('/items/:ref/availability', async (req, res) => {
+    const a = req.body.available;
+    res.json(svc.itemOut(await svc.setItemAvailable(restaurantOf(req), ref(req), a === undefined ? undefined : (a === true || a === 'true' || a === 1 || a === '1'))));
+  });
+  r.delete('/items/:ref', async (req, res) => { await svc.deleteItem(restaurantOf(req), ref(req)); res.status(204).end(); });
+}
+
 // ---- super admin ----
 const admin = express.Router();
 admin.use(auth('admin'));
@@ -113,6 +136,11 @@ admin.post('/restaurants/:id/reveal-password', async (req, res) => {
   res.json({ password: await svc.revealOwnerPassword(id(req)) });
 });
 admin.delete('/restaurants/:id', async (req, res) => { await svc.deleteRestaurant(id(req)); res.status(204).end(); });
+// Manage a restaurant's menu on its behalf (what the "Manage menu" button in the admin console uses).
+const adminMenu = express.Router({ mergeParams: true });
+adminMenu.use(async (req, res, next) => { await svc.getRestaurant(Number(req.params.id)); next(); }); // 404 for an unknown restaurant
+menuRoutes(adminMenu, req => Number(req.params.id));
+admin.use('/restaurants/:id', adminMenu);
 router.use('/admin', admin);
 
 // ---- restaurant owner ----
@@ -121,23 +149,7 @@ owner.use(auth('owner'));
 owner.get('/restaurant', async (req, res) => res.json(svc.restaurantOut(await svc.getRestaurant(rid(req)))));
 owner.patch('/restaurant', async (req, res) => res.json(svc.restaurantOut(await svc.updateProfile(rid(req), req.body))));
 
-owner.get('/categories', async (req, res) => res.json({ categories: await svc.listCategories(rid(req)) }));
-owner.post('/categories', async (req, res) => res.status(201).json(await svc.createCategory(rid(req), req.body.name)));
-owner.put('/categories/:id', async (req, res) => res.json(await svc.renameCategory(rid(req), id(req), req.body.name)));
-owner.delete('/categories/:id', async (req, res) => { await svc.deleteCategory(rid(req), id(req)); res.status(204).end(); });
-
-// Items accept JSON (photo as a data URL) or multipart/form-data (field "image").
-owner.get('/items', async (req, res) => res.json({ items: (await svc.listItems(rid(req), Number(req.query.category_id) || null)).map(svc.itemOut) }));
-owner.post('/items', upload.single('image'), async (req, res) =>
-  res.status(201).json(svc.itemOut(await svc.saveItem(rid(req), req.body, photo(req)))));
-owner.get('/items/:id', async (req, res) => res.json(svc.itemOut(await svc.getItem(rid(req), id(req)))));
-owner.put('/items/:id', upload.single('image'), async (req, res) =>
-  res.json(svc.itemOut(await svc.saveItem(rid(req), { ...req.body, id: id(req) }, photo(req)))));
-owner.patch('/items/:id/availability', async (req, res) => {
-  const a = req.body.available;
-  res.json(svc.itemOut(await svc.setItemAvailable(rid(req), id(req), a === undefined ? undefined : (a === true || a === 'true' || a === 1 || a === '1'))));
-});
-owner.delete('/items/:id', async (req, res) => { await svc.deleteItem(rid(req), id(req)); res.status(204).end(); });
+menuRoutes(owner, rid);
 
 owner.get('/qr.png', async (req, res) => {
   const r = await svc.getRestaurant(rid(req));

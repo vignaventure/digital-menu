@@ -61,7 +61,7 @@ test('every documented operation is a real route', async () => {
   let checked = 0;
   for (const [p, ops] of Object.entries(spec.paths)) {
     for (const [method, o] of Object.entries(ops)) {
-      const url = '/api/v1' + p.replace('{slug}', 'no-such-menu').replace('{id}', '999999');
+      const url = '/api/v1' + p.replace('{slug}', 'no-such-menu').replace(/\{\w+\}/g, '999999');
       const token = o.tags[0] === 'Admin' ? admin : o.tags[0] === 'Restaurant' ? owner : undefined;
       const r = await call(method.toUpperCase(), url, { token, json: ['post', 'put', 'patch'].includes(method) ? {} : undefined });
       // an unknown route answers {"error":"Not found"}; real routes answer with their own status/message
@@ -70,5 +70,5 @@ test('every documented operation is a real route', async () => {
       checked++;
     }
   }
-  assert.ok(checked >= 28, `only ${checked} operations checked`);
+  assert.ok(checked >= 38, `only ${checked} operations checked`);
 });

@@ -300,3 +300,48 @@ test('super admin can view the password it set (encrypted at rest); owner change
   assert.ok(!JSON.stringify(list).includes('OwnerChose3'));
   assert.ok(await login('9000000055', 'OwnerChose3'));
 });
+
+test('admin can manage any restaurant\'s menu from the admin console', async () => {
+  const admin = await login('admin@test.com', 'AdminPass123');
+  const A = (method, url, json) => call(method, '/api/v1/admin/restaurants' + url, { token: admin, json });
+  const r1 = (await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Managed Cafe', mobile: '9333300001', password: 'secret12' } })).body;
+  const r2 = (await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Other Managed', mobile: '9333300002', password: 'secret12' } })).body;
+  const owner1 = await login('9333300001', 'secret12');
+
+  // add a category and a dish (with a photo) for restaurant 1 without using its login
+  const cat = await A('POST', `/${r1.id}/categories`, { name: 'Starters' });
+  assert.equal(cat.status, 201);
+  const dish = await A('POST', `/${r1.id}/items`, { name: 'Paneer Tikka', price: 199, category_id: cat.body.id, image: PNG_URL });
+  assert.equal(dish.status, 201);
+  assert.match(dish.body.image, /^\/uploads\//);
+  assert.equal((await A('GET', `/${r1.id}/categories`)).body.categories[0].items, 1);
+
+  // the owner sees exactly what the admin added; so do guests
+  assert.deepEqual((await call('GET', '/api/v1/items', { token: owner1 })).body.items.map(i => i.name), ['Paneer Tikka']);
+  assert.equal((await call('GET', `/api/v1/public/menu/${r1.slug}`)).body.categories[0].items[0].name, 'Paneer Tikka');
+
+  // edit, hide and filter
+  assert.equal((await A('PUT', `/${r1.id}/items/${dish.body.id}`, { name: 'Paneer Tikka', price: 220, category_id: cat.body.id })).body.price, 220);
+  assert.equal((await A('PATCH', `/${r1.id}/items/${dish.body.id}/availability`, { available: false })).body.available, false);
+  assert.equal((await call('GET', `/api/v1/public/menu/${r1.slug}`)).body.categories.length, 0);
+  assert.equal((await A('GET', `/${r1.id}/items?category_id=${cat.body.id}`)).body.items.length, 1);
+
+  // restaurants stay separate: another restaurant's path can't reach this restaurant's data
+  assert.equal((await A('GET', `/${r2.id}/items`)).body.items.length, 0);
+  assert.equal((await A('PUT', `/${r2.id}/items/${dish.body.id}`, { name: 'x', price: 1, category_id: cat.body.id })).status, 400); // category belongs to restaurant 1
+  assert.equal((await A('DELETE', `/${r2.id}/items/${dish.body.id}`)).status, 404);
+  assert.equal((await A('POST', `/${r2.id}/items`, { name: 'Sneaky', price: 5, category_id: cat.body.id })).status, 400);
+  assert.equal((await A('GET', '/999999/items')).status, 404);                                     // unknown restaurant
+
+  // access rules: not for owners, not for anonymous callers
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${r1.id}/items`, { token: owner1 })).status, 403);
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${r1.id}/items`)).status, 401);
+
+  // a category with dishes can't be deleted; remove the dish first
+  assert.equal((await A('DELETE', `/${r1.id}/categories/${cat.body.id}`)).status, 409);
+  assert.equal((await A('DELETE', `/${r1.id}/items/${dish.body.id}`)).status, 204);
+  assert.equal((await A('DELETE', `/${r1.id}/categories/${cat.body.id}`)).status, 204);
+
+  // the admin list still reports item counts the table shows
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${r1.id}`, { token: admin })).body.item_count, 0);
+});

@@ -38,6 +38,7 @@ Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 
 | POST | `/admin/restaurants/:id/password` | `{password}` sets a specific one → 204 |
 | POST | `/admin/restaurants/:id/reveal-password` | `{password}`: the password the admin set (stored encrypted), or `null` if the owner changed it since. |
 | DELETE | `/admin/restaurants/:id` | → 204, removes all data and photos |
+| (same as the owner's menu endpoints) | `/admin/restaurants/:id/categories`, `/categories/:ref`, `/items`, `/items/:ref`, `/items/:ref/availability` | Manage any restaurant's menu on its behalf ("Manage menu" in the admin console). Same methods, bodies and rules as the owner endpoints below; `:id` is the restaurant, `:ref` the category or item. 404 for an unknown restaurant. |
 
 ## Restaurant owner (role `owner`)
 | Method | Path | Body / notes |
