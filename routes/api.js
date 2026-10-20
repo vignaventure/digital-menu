@@ -112,6 +112,11 @@ function menuRoutes(r, restaurantOf) {
     res.json(svc.itemOut(await svc.setItemAvailable(restaurantOf(req), ref(req), a === undefined ? undefined : (a === true || a === 'true' || a === 1 || a === '1'))));
   });
   r.delete('/items/:ref', async (req, res) => { await svc.deleteItem(restaurantOf(req), ref(req)); res.status(204).end(); });
+
+  // "Add menu": browse what other restaurants publish and copy dishes / categories into this one
+  r.get('/library/categories', async (req, res) => res.json({ categories: await svc.libraryCategories(restaurantOf(req)) }));
+  r.get('/library/items', async (req, res) => res.json(await svc.libraryItems(restaurantOf(req), req.query)));
+  r.post('/library/import', async (req, res) => res.json(await svc.importFromLibrary(restaurantOf(req), req.body)));
 }
 
 // ---- super admin ----

@@ -70,5 +70,5 @@ test('every documented operation is a real route', async () => {
       checked++;
     }
   }
-  assert.ok(checked >= 38, `only ${checked} operations checked`);
+  assert.ok(checked >= 44, `only ${checked} operations checked`);
 });

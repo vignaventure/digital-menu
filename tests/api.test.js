@@ -348,3 +348,79 @@ test('admin can manage any restaurant\'s menu from the admin console', async () 
   // the admin list still reports item counts the table shows
   assert.equal((await call('GET', `/api/v1/admin/restaurants/${r1.id}`, { token: admin })).body.item_count, 0);
 });
+
+test('Add menu: browse other restaurants, copy dishes and categories into mine', async () => {
+  const admin = await login('admin@test.com', 'AdminPass123');
+  const mk = async (name, mobile, extra = {}) => (await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name, mobile, password: 'secret12', ...extra } })).body;
+  const me = await mk('Lib Target', '9444400001'), src = await mk('Lib Source', '9444400002');
+  const off = await mk('Lib Inactive', '9444400003'), old = await mk('Lib Expired', '9444400004', { plan_type: 'limited', plan_expires: '2000-01-01' });
+  const [meT, srcT, offT, oldT] = await Promise.all(['9444400001', '9444400002', '9444400003', '9444400004'].map(m => login(m, 'secret12')));
+  const add = async (t, cat, name, price, extra = {}) => {
+    const c = (await call('GET', '/api/v1/categories', { token: t })).body.categories.find(x => x.name === cat) || (await call('POST', '/api/v1/categories', { token: t, json: { name: cat } })).body;
+    return (await call('POST', '/api/v1/items', { token: t, json: { name, price, category_id: c.id, description: `${name} desc`, ...extra } })).body;
+  };
+  const tikka = await add(srcT, 'Starters', 'Paneer Tikka', 199, { image: PNG_URL });
+  const roll = await add(srcT, 'Starters', 'Veg Roll', 99);
+  const lassi = await add(srcT, 'Drinks', 'Sweet Lassi', 60);
+  await call('PATCH', `/api/v1/items/${lassi.id}/availability`, { token: srcT, json: { available: false } }); // hidden: must not be offered
+  const ghost = await add(offT, 'Starters', 'Inactive Special', 50);                                      // inactive restaurant
+  const stale = await add(oldT, 'Starters', 'Expired Special', 50);                                       // expired plan
+  await call('PATCH', `/api/v1/admin/restaurants/${off.id}`, { token: admin, json: { active: false } });
+  const mine = await add(meT, 'Starters', 'My Own Dish', 10);
+
+  // catalogue: only visible dishes of live restaurants, never my own
+  const cats = (await call('GET', '/api/v1/library/categories', { token: meT })).body.categories;
+  assert.deepEqual(cats.map(c => [c.restaurant, c.name, c.items]), [['Lib Source', 'Starters', 2]]);   // Drinks has no visible dish
+  const all = (await call('GET', '/api/v1/library/items', { token: meT })).body;
+  assert.deepEqual(all.items.map(i => i.name), ['Paneer Tikka', 'Veg Roll']);
+  assert.equal(all.total, 2);
+  assert.equal(all.items[0].restaurant, 'Lib Source');
+  const get = q => call('GET', `/api/v1/library/items?${q}`, { token: meT }).then(r => r.body);
+  assert.deepEqual((await get('q=TIKKA')).items.map(i => i.name), ['Paneer Tikka']);                 // search, case-insensitive
+  assert.deepEqual((await get('category=starters')).items.length, 2);                                 // category by name
+  assert.equal((await get('category=drinks')).total, 0);
+  assert.equal((await get(`restaurant_id=${off.id}`)).total, 0);
+  const page = await get('limit=1&offset=1');
+  assert.deepEqual([page.items.map(i => i.name), page.total], [['Veg Roll'], 2]);                      // paging
+  assert.equal((await get('q=.*')).total, 0);                                                         // search text is not a regex
+
+  // copy one dish: category is created, the photo is copied (own file), the source is untouched
+  const one = await call('POST', '/api/v1/library/import', { token: meT, json: { items: [tikka.id] } });
+  assert.deepEqual(one.body, { added_items: 1, skipped_items: 0, added_categories: 0 });               // "Starters" already existed
+  const myItems = (await call('GET', '/api/v1/items', { token: meT })).body.items;
+  const copy = myItems.find(i => i.name === 'Paneer Tikka');
+  assert.deepEqual([copy.price, copy.description, copy.category, copy.available], [199, 'Paneer Tikka desc', 'Starters', true]);
+  assert.notEqual(copy.image, tikka.image);
+  assert.ok(fs.existsSync(path.join(uploadsDir(), path.basename(copy.image))));
+
+  // same dish again is skipped
+  assert.deepEqual((await call('POST', '/api/v1/library/import', { token: meT, json: { items: [tikka.id] } })).body, { added_items: 0, skipped_items: 1, added_categories: 0 });
+
+  // a whole category with its dishes: only the missing dish is added
+  const withItems = await call('POST', '/api/v1/library/import', { token: meT, json: { categories: [{ category_id: cats[0].category_id, with_items: true }] } });
+  assert.deepEqual(withItems.body, { added_items: 1, skipped_items: 1, added_categories: 0 });
+  assert.deepEqual((await call('GET', '/api/v1/items', { token: meT })).body.items.map(i => i.name).sort(), ['My Own Dish', 'Paneer Tikka', 'Veg Roll']);
+
+  // a category alone (no dishes) creates just the category, named like the source
+  const srcDrinks = (await call('GET', '/api/v1/categories', { token: srcT })).body.categories.find(c => c.name === 'Drinks');
+  assert.equal((await call('POST', '/api/v1/library/import', { token: meT, json: { categories: [{ category_id: srcDrinks.id }] } })).body.added_categories, 1);
+  assert.ok((await call('GET', '/api/v1/categories', { token: meT })).body.categories.some(c => c.name === 'Drinks' && c.items === 0));
+
+  // things that must never be copied: hidden dishes, inactive/expired restaurants, my own dishes
+  const refused = await call('POST', '/api/v1/library/import', { token: meT, json: { items: [lassi.id, ghost.id, stale.id, mine.id] } });
+  assert.deepEqual(refused.body, { added_items: 0, skipped_items: 4, added_categories: 0 });
+  assert.equal((await call('POST', '/api/v1/library/import', { token: meT, json: {} })).status, 400);
+  assert.equal((await call('POST', '/api/v1/library/import', { token: meT, json: { items: Array.from({ length: 301 }, (_, i) => i + 1) } })).status, 400);
+
+  // deleting my copy leaves the source's photo alone
+  await call('DELETE', `/api/v1/items/${copy.id}`, { token: meT });
+  await settle();
+  assert.ok(fs.existsSync(path.join(uploadsDir(), path.basename(tikka.image))));
+
+  // the admin can do the same for a restaurant ("Manage menu" -> "Add menu"); owners of other restaurants can't
+  const viaAdmin = await call('POST', `/api/v1/admin/restaurants/${me.id}/library/import`, { token: admin, json: { items: [tikka.id] } });
+  assert.deepEqual(viaAdmin.body, { added_items: 1, skipped_items: 0, added_categories: 0 });
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${me.id}/library/items`, { token: admin })).body.items.some(i => i.restaurant_id === me.id), false);
+  assert.equal((await call('GET', `/api/v1/admin/restaurants/${me.id}/library/items`, { token: srcT })).status, 403);
+  assert.equal((await call('GET', '/api/v1/library/items')).status, 401);
+});

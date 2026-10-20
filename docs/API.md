@@ -51,6 +51,9 @@ Errors: `{"error": "message"}` with a 4xx/5xx status. Login is rate-limited (20 
 | POST | `/items` | `{name, price, category_id, description?, available?, image?}`. `image` is a PNG/JPEG/WebP **data URL** (≤ ~1.5 MB); alternatively send `multipart/form-data` with a file field `image`. |
 | GET / PUT / DELETE | `/items/:id` | PUT takes the same fields; omit `image` to keep the photo, send `remove_image: true` to clear it. |
 | PATCH | `/items/:id/availability` | `{available: true\|false}` (omit to toggle) |
+| GET | `/library/categories` | **Add menu**: categories other restaurants publish (only what guests can already see: shown dishes of active, unexpired restaurants; your own restaurant is left out). Each has `category_id`, `name`, `restaurant`, `items` (dish count). |
+| GET | `/library/items?q=&category=&restaurant_id=&limit=&offset=` | Search those dishes: `q` matches name or description, `category` is a category name, `limit` up to 100. Returns `{total, items}`. |
+| POST | `/library/import` | `{items: [dishIds], categories: [{category_id, with_items}]}` copies them into your menu: categories are matched by name (created when missing), dishes already in the same category are skipped, photos are copied. Max 300 dishes per call. → `{added_items, skipped_items, added_categories}`. The admin can do the same for any restaurant under `/admin/restaurants/:id/library/...`. |
 | GET | `/qr.png` | PNG QR for the menu URL; `?size=800` (128-2048), `?download=1` |
 
 ### Example

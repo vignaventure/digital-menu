@@ -9,7 +9,7 @@ window.MenuManager = (() => {
       <div class="stats" data-stats></div>
       <div class="toolbar">
         <div class="filters"><input type="search" data-q placeholder="Search items…" aria-label="Search items"><select data-cat aria-label="Filter by category"><option value="">All categories</option></select></div>
-        <div class="actions"><div data-view></div><button class="ghost" data-cats>${ico('tag')} Categories</button><button data-add>${ico('plus')} Add item</button></div>
+        <div class="actions"><div data-view></div><button class="ghost" data-cats>${ico('tag')} Categories</button><button class="ghost" data-library>${ico('store')} Add menu</button><button data-add>${ico('plus')} Add item</button></div>
       </div>
       <div class="items" data-list></div>`;
 
@@ -114,6 +114,7 @@ window.MenuManager = (() => {
     ['input', 'change'].forEach((ev) => { q('[data-q]').addEventListener(ev, paint); q('[data-cat]').addEventListener(ev, paint); });
     q('[data-add]').addEventListener('click', () => itemModal(null));
     q('[data-cats]').addEventListener('click', categoriesModal);
+    q('[data-library]').addEventListener('click', () => (window.MenuLibrary ? MenuLibrary.open({ base, onDone: changed }) : toast('Please refresh the page and try again')));
     q('[data-list]').addEventListener('click', async (e) => {
       const b = e.target.closest('button[data-act]'); if (!b) return;
       const i = items.find((x) => x.id == b.dataset.id);

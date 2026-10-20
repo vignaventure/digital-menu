@@ -25,7 +25,7 @@
         <input type="search" id="iSearch" placeholder="Search items…" aria-label="Search items">
         <select id="iCat" aria-label="Filter by category"><option value="">All categories</option></select>
       </div>
-      <div class="actions"><div id="itemView"></div><button id="addItem" data-ico="plus">Add item</button></div>
+      <div class="actions"><div id="itemView"></div><button class="ghost" id="addMenu" data-ico="store">Add menu</button><button id="addItem" data-ico="plus">Add item</button></div>
     </div>
     <div id="itemList" class="items"></div>
   </section>
@@ -101,6 +101,7 @@
 </main>
 </div>
 <script src="/app.js"></script>
+<script src="/menu-library.js"></script>
 <script>
 let profile, categories = [], items = [], logoData = null, logoRemoved = false;
 const thumbHtml = (img, name) => img ? `<img src="${esc(img)}" alt="" loading="lazy">` : esc((name || '?').trim().charAt(0).toUpperCase());
@@ -166,6 +167,7 @@ function itemModal(item) {
   });
 }
 $('#addItem').addEventListener('click', () => itemModal(null));
+$('#addMenu').addEventListener('click', () => MenuLibrary.open({ base: '/api/v1', onDone: loadAll }));
 $('#itemList').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const i = items.find((x) => x.id == b.dataset.id);
