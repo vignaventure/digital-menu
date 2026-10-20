@@ -36,7 +36,11 @@ app.get('/health', async (req, res) => {
   catch { res.status(503).json({ status: 'error' }); }
 });
 
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: isProd ? '1h' : 0 }));
+// Pages, scripts and styles are re-checked on every load (cheap 304 when unchanged), so a deploy shows up immediately
+// and a browser never mixes an old script with a new one. Fonts never change, so they are cached for a year.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, file) => res.setHeader('Cache-Control', /[\\/]fonts[\\/]/.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+}));
 // Upload names are random UUIDs, so they can be cached forever.
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
 

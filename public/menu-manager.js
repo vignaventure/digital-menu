@@ -124,9 +124,10 @@ window.MenuManager = (() => {
       } catch (er) { toast(er.message); }
     });
 
-    viewToggle(q('[data-view]'), 'dm_view_items', (m) => q('[data-list]').classList.toggle('as-list', m === 'list')); // same preference as the restaurant dashboard
-
-    return reload().then(() => ({ reload }));
+    const loaded = reload().then(() => ({ reload })); // load the menu first: nothing below may be able to block it
+    // grid/list switch (same saved preference as the restaurant dashboard); optional, so a stale cached app.js can't break the editor
+    if (typeof viewToggle === 'function') viewToggle(q('[data-view]'), 'dm_view_items', (m) => q('[data-list]').classList.toggle('as-list', m === 'list'));
+    return loaded;
   }
   return { mount };
 })();

@@ -54,6 +54,9 @@ test('pages are served', async () => {
   }
   assert.equal((await call('GET', '/m/does-not-exist')).status, 404);
   assert.equal((await call('GET', '/style.css')).status, 200);
+  // scripts/pages are revalidated every time (no stale mix after a deploy); fonts are cached long
+  for (const f of ['/app.js', '/style.css', '/admin.html']) assert.equal((await call('GET', f)).headers.get('cache-control'), 'no-cache', f);
+  assert.match((await call('GET', '/fonts/inter-latin.woff2')).headers.get('cache-control'), /max-age=31536000/);
   assert.equal((await call('GET', '/fonts/inter-latin.woff2')).status, 200);
   const h = await call('GET', '/health');
   assert.equal(h.status, 200);
