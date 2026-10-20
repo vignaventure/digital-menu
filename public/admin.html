@@ -6,7 +6,7 @@
 <aside class="side">
   <div class="brand"><div class="mark" data-ico="shield"></div><div>Digital Menu<small>Admin console</small></div></div>
   <nav class="tabs" id="tabs">
-    <button data-tab="restaurants" data-ico="store" data-sub="Every onboarded restaurant, its onboarding price and status"><span>Restaurants</span></button>
+    <button class="on" data-tab="restaurants" data-ico="store" data-sub="Every onboarded restaurant, its onboarding price and status"><span>Restaurants</span></button>
     <button data-tab="onboard" data-ico="plus" data-title="Onboard restaurant" data-sub="Create the restaurant and its dashboard login"><span>Onboard restaurant</span></button>
     <button data-tab="password" data-ico="key" data-title="Change password" data-sub="Update the password you use to log in"><span>Change password</span></button>
   </nav>
@@ -14,10 +14,10 @@
   <button class="logout" onclick="logout()" data-ico="logout"><span>Log out</span></button>
 </aside>
 <main class="main wide">
-  <div class="page-head"><h1 id="pageTitle"></h1><p id="pageSub"></p></div>
+  <div class="page-head"><h1 id="pageTitle">Restaurants</h1><p id="pageSub">Every onboarded restaurant, its onboarding price and status</p></div>
 
   <section data-panel="restaurants">
-    <div class="stats" id="stats"></div>
+    <div class="stats" id="stats"><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div></div>
     <div class="card">
       <div class="toolbar">
         <h3 style="margin:0">Onboarded restaurants</h3>
@@ -26,16 +26,16 @@
           <select id="rStatus" aria-label="Filter by status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="unpaid">Payment pending</option></select>
         </div>
       </div>
-      <div class="table-wrap" id="rList"></div>
+      <div class="table-wrap" id="rList"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
     </div>
   </section>
 
-  <section data-panel="menu">
+  <section data-panel="menu" class="hidden">
     <div class="card" id="menuHead"></div>
     <div id="menuMount"></div>
   </section>
 
-  <section data-panel="onboard">
+  <section data-panel="onboard" class="hidden">
     <form id="obForm" class="card" autocomplete="off">
       <h3>Restaurant details</h3>
       <div class="row">
@@ -57,7 +57,7 @@
     </form>
   </section>
 
-  <section data-panel="password">
+  <section data-panel="password" class="hidden">
     <form id="pwf" class="card" autocomplete="off">
       <h3>Change password</h3><p class="small muted">Use at least 8 characters.</p>
       <div class="row">
@@ -133,7 +133,7 @@ function openMenu(r) {
     <a class="btn ghost" href="${esc(r.menu_url)}" target="_blank" rel="noopener">Open guest menu ↗</a></div>
     <div class="note" style="margin-bottom:0">You are editing this menu on behalf of ${esc(r.owner || r.name)}. The restaurant sees these changes in its own dashboard.</div>`;
   $('#menuHead [data-backlist]').addEventListener('click', () => showTab('restaurants'));
-  $('#menuMount').innerHTML = '<p class="muted">Loading…</p>';
+  $('#menuMount').innerHTML = `<div class="stats">${skelStats(4)}</div><div class="items">${skelCards(4)}</div>`;
   history.replaceState(null, '', '#menu-' + r.id);
   scrollTo(0, 0);
   MenuManager.mount($('#menuMount'), { base: `/api/v1/admin/restaurants/${r.id}`, themeColor: r.theme_color, onChange: load })

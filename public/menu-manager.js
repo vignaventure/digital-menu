@@ -6,12 +6,12 @@ window.MenuManager = (() => {
     let categories = [], items = [];
     const q = (s, root = el) => root.querySelector(s);
     el.innerHTML = `
-      <div class="stats" data-stats></div>
+      <div class="stats" data-stats>${skelStats(4)}</div>
       <div class="toolbar">
         <div class="filters"><input type="search" data-q placeholder="Search items…" aria-label="Search items"><select data-cat aria-label="Filter by category"><option value="">All categories</option></select></div>
         <div class="actions"><div data-view></div><button class="ghost" data-cats>${ico('tag')} Categories</button><button class="ghost" data-library>${ico('store')} Add menu</button><button data-add>${ico('plus')} Add item</button></div>
       </div>
-      <div class="items" data-list></div>`;
+      <div class="items" data-list>${skelCards(4)}</div>`;
 
     const thumb = (img, name) => img ? `<img src="${esc(img)}" alt="" loading="lazy">` : esc((name || '?').trim().charAt(0).toUpperCase());
 
@@ -33,8 +33,11 @@ window.MenuManager = (() => {
         : `<div class="card empty" style="grid-column:1/-1">${items.length ? 'No items match your search.' : 'No items yet. Click “Add item” to create the first dish.'}</div>`;
     }
     async function reload() {
-      const [c, i] = await Promise.all([api(`${base}/categories`), api(`${base}/items`)]);
-      categories = c.categories; items = i.items; paint();
+      q('[data-list]').classList.add('is-busy');
+      try {
+        const [c, i] = await Promise.all([api(`${base}/categories`), api(`${base}/items`)]);
+        categories = c.categories; items = i.items; paint();
+      } finally { q('[data-list]').classList.remove('is-busy'); }
     }
     const changed = async () => { await reload(); onChange?.(); };
 

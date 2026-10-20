@@ -1,5 +1,26 @@
 // Shared helpers for the login, admin, dashboard and menu pages (talks to /api/v1 with the login cookie).
-async function api(path, method = 'GET', body) {
+// ---- loading feedback: a progress bar while any request runs, a spinner on the button that was pressed ----
+let inflight = 0, apiStarts = 0, barTimer;
+const loadStart = () => { inflight++; apiStarts++; clearTimeout(barTimer); barTimer = setTimeout(() => document.documentElement.classList.add('is-loading'), 120); }; // short requests never flash the bar
+const loadEnd = () => { inflight = Math.max(0, inflight - 1); if (!inflight) { clearTimeout(barTimer); document.documentElement.classList.remove('is-loading'); document.dispatchEvent(new Event('api-idle')); } };
+document.body.insertAdjacentHTML('beforeend', '<div class="loadbar" aria-hidden="true"></div>');
+// Any form submit: show a spinner on its button until the request(s) it started finish.
+document.addEventListener('submit', (e) => {
+  const btn = e.submitter || e.target.querySelector('button:not([type=button])');
+  if (!btn || btn.classList.contains('btn-loading')) return;
+  const before = apiStarts, timers = [];
+  const done = () => { btn.classList.remove('btn-loading'); document.removeEventListener('api-idle', onIdle); timers.forEach(clearTimeout); };
+  const onIdle = () => { if (apiStarts > before) done(); };
+  btn.classList.add('btn-loading'); document.addEventListener('api-idle', onIdle);
+  timers.push(setTimeout(() => { if (apiStarts === before) done(); }, 700), setTimeout(done, 30000)); // nothing was sent (e.g. a client-side check failed) / safety net
+}, true);
+// grey placeholder shapes shown while a screen's data is on its way
+const skelRows = (n = 5) => Array.from({ length: n }, () => '<div class="skel skel-row"></div>').join('');
+const skelCards = (n = 6) => Array.from({ length: n }, () => '<div class="skel skel-card"></div>').join('');
+const skelStats = (n = 4) => Array.from({ length: n }, () => '<div class="skel skel-stat"></div>').join('');
+
+function api(path, method = 'GET', body) { loadStart(); return rawApi(path, method, body).finally(loadEnd); }
+async function rawApi(path, method = 'GET', body) {
   const res = await fetch(path, { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

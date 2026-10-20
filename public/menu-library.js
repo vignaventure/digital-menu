@@ -13,12 +13,12 @@ window.MenuLibrary = (() => {
       <div data-p="items">
         <div class="filters lib-filters"><input type="search" data-q placeholder="Search dishes from all restaurants…" aria-label="Search dishes"><select data-rest aria-label="Restaurant"><option value="">All restaurants</option></select></div>
         <div class="lib-chips" data-chips></div>
-        <div class="lib-list" data-list><p class="muted">Loading…</p></div>
+        <div class="lib-list" data-list>${skelRows(5)}</div>
         <div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="ghost sm hidden" data-more>Load more</button></div>
       </div>
       <div data-p="cats" class="hidden">
         <label class="check" style="margin-top:0"><input type="checkbox" data-with checked> Also add all the dishes in the categories I select</label>
-        <div class="lib-list" data-catlist style="margin-top:10px"></div>
+        <div class="lib-list" data-catlist style="margin-top:10px">${skelRows(4)}</div>
       </div>
       <div class="err" data-err role="alert"></div>
       <div class="card-foot lib-foot"><span class="muted small" data-count></span><button type="button" class="ghost" data-close>Cancel</button><button type="button" data-add disabled>Add selected</button></div>` });
@@ -58,10 +58,12 @@ window.MenuLibrary = (() => {
     async function loadDishes(append = false) {
       const p = new URLSearchParams({ limit: 30, offset: append ? rows.length : 0 });
       for (const k of ['q', 'category', 'restaurant_id']) if (filter[k]) p.set(k, filter[k]);
+      q('[data-list]').classList.add('is-busy');
       try {
         const r = await api(`${base}/library/items?${p}`);
         rows = append ? rows.concat(r.items) : r.items; total = r.total; drawDishes();
       } catch (er) { q('[data-err]').textContent = er.message; }
+      finally { q('[data-list]').classList.remove('is-busy'); }
     }
 
     // ---- categories ----

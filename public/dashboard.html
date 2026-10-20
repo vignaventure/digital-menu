@@ -6,7 +6,7 @@
 <aside class="side">
   <div class="brand"><div class="mark" data-ico="menu"></div><div><span id="brandName">Restaurant</span><small>Menu dashboard</small></div></div>
   <nav class="tabs" id="tabs">
-    <button data-tab="items" data-ico="list" data-title="Menu items" data-sub="Add dishes with a photo, price and category"><span>Menu items</span></button>
+    <button class="on" data-tab="items" data-ico="list" data-title="Menu items" data-sub="Add dishes with a photo, price and category"><span>Menu items</span></button>
     <button data-tab="categories" data-ico="tag" data-sub="Group your dishes, for example Starters or Drinks"><span>Categories</span></button>
     <button data-tab="qr" data-ico="qr" data-title="QR code" data-sub="Guests scan this to open your menu on their phone"><span>QR code</span></button>
     <button data-tab="details" data-ico="store" data-title="Restaurant details" data-sub="Branding, business information and password"><span>Restaurant details</span></button>
@@ -15,11 +15,11 @@
   <button class="logout" onclick="logout()" data-ico="logout"><span>Log out</span></button>
 </aside>
 <main class="main">
-  <div class="page-head"><h1 id="pageTitle"></h1><p id="pageSub"></p></div>
+  <div class="page-head"><h1 id="pageTitle">Menu items</h1><p id="pageSub">Add dishes with a photo, price and category</p></div>
 
   <!-- MENU ITEMS -->
   <section data-panel="items">
-    <div class="stats" id="itemStats"></div>
+    <div class="stats" id="itemStats"><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div><div class="skel skel-stat"></div></div>
     <div class="toolbar">
       <div class="filters">
         <input type="search" id="iSearch" placeholder="Search items…" aria-label="Search items">
@@ -27,23 +27,23 @@
       </div>
       <div class="actions"><div id="itemView"></div><button class="ghost" id="addMenu" data-ico="store">Add menu</button><button id="addItem" data-ico="plus">Add item</button></div>
     </div>
-    <div id="itemList" class="items"></div>
+    <div id="itemList" class="items"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>
   </section>
 
   <!-- CATEGORIES -->
-  <section data-panel="categories">
+  <section data-panel="categories" class="hidden">
     <form id="catForm" class="card">
       <h3>Add a category</h3>
       <div class="actions"><input name="name" placeholder="e.g. Starters, Main Course, Drinks" maxlength="40" required style="flex:1;min-width:200px" aria-label="Category name"><button class="lg">Add category</button></div>
       <div class="err" id="catErr" role="alert"></div>
     </form>
-    <div class="card"><h3>Your categories</h3><div class="table-wrap" id="catList"></div></div>
+    <div class="card"><h3>Your categories</h3><div class="table-wrap" id="catList"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div></div></div>
   </section>
 
   <!-- QR -->
-  <section data-panel="qr">
+  <section data-panel="qr" class="hidden">
     <div class="grid2">
-      <div class="card"><div class="qr-box"><img id="qrImg" alt="QR code for your menu"></div></div>
+      <div class="card"><div class="qr-box" id="qrBox"><img id="qrImg" alt="QR code for your menu"></div></div>
       <div class="card">
         <h3>Your menu link</h3>
         <div class="secret" id="menuUrl"></div>
@@ -57,7 +57,7 @@
   </section>
 
   <!-- DETAILS -->
-  <section data-panel="details">
+  <section data-panel="details" class="hidden">
     <div class="subtabs">
       <button type="button" data-subtab="branding" class="on">Branding</button>
       <button type="button" data-subtab="business">Business information</button>
@@ -208,7 +208,9 @@ $('#catList').addEventListener('click', async (e) => {
 
 // ---------- QR ----------
 function renderQr() {
-  $('#qrImg').src = `/api/v1/qr.png?size=640&v=${Date.now()}`;
+  const qr = $('#qrImg'); $('#qrBox').classList.add('skel'); qr.style.opacity = 0;
+  qr.onload = qr.onerror = () => { $('#qrBox').classList.remove('skel'); qr.style.opacity = 1; };
+  qr.src = `/api/v1/qr.png?size=640&v=${Date.now()}`;
   $('#menuUrl').textContent = profile.menu_url; $('#openMenu').href = profile.menu_url;
   $('#dlQr').href = '/api/v1/qr.png?size=1500&download=1'; $('#dlQr').setAttribute('download', '');
   $('#lanNote').textContent = /localhost|127\.0\.0\.1/.test(profile.menu_url) ? 'Tip: this QR points to a local address, so phones cannot open it. Set BASE_URL to your real web address when you deploy.' : '';

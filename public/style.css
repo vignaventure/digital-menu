@@ -231,3 +231,19 @@ body.menu-page .vtoggle button.on, body.menu-page .vtoggle button.on:hover { bac
 /* keep the counter + "Add selected" button in view while the popup scrolls (matters on phones) */
 .modal-box .lib-foot { position: sticky; bottom: -22px; z-index: 2; margin: 16px -22px -22px; padding: 14px 22px; background: var(--card); border-radius: 0 0 16px 16px; }
 @media (max-width: 560px) { .lib-list { max-height: 36vh; } }
+
+/* ---- loading feedback (see app.js) ---- */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes loadbar { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.loadbar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 300; pointer-events: none; opacity: 0; transition: opacity .2s; overflow: hidden; }
+.loadbar::after { content: ''; position: absolute; inset: 0; width: 45%; background: linear-gradient(90deg, transparent, var(--theme, var(--brand)), transparent); animation: loadbar 1s ease-in-out infinite; }
+html.is-loading .loadbar { opacity: 1; }
+body.menu-page .loadbar::after { background: linear-gradient(90deg, transparent, #fff, transparent); } /* the guest menu opens on a coloured header */
+.btn-loading { pointer-events: none; opacity: .85; }
+.btn-loading::before { content: ''; flex: none; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+.skel { background: linear-gradient(90deg, var(--line) 25%, var(--raised) 37%, var(--line) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 10px; }
+.skel-row { height: 46px; margin: 10px 0; } .skel-stat { height: 84px; border-radius: var(--radius); } .skel-card { height: 270px; border-radius: 14px; }
+.skel-hero { height: 190px; border-radius: 0; background-color: var(--theme, var(--brand)); background-image: linear-gradient(90deg, transparent 25%, rgba(255,255,255,.18) 37%, transparent 63%); }
+.is-busy { opacity: .45; transition: opacity .15s; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .skel, .btn-loading::before, .loadbar::after { animation-duration: 3s; } }
