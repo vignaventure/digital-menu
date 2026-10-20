@@ -159,7 +159,9 @@ menuRoutes(owner, rid);
 owner.get('/qr.png', async (req, res) => {
   const r = await svc.getRestaurant(rid(req));
   res.type('png').set('Content-Disposition', req.query.download ? `attachment; filename="${r.slug}-menu-qr.png"` : 'inline');
-  res.send(await QRCode.toBuffer(`${BASE_URL}/m/${r.slug}`, { width: Math.min(Math.max(Number(req.query.size) || 800, 128), 2048), margin: 2, errorCorrectionLevel: 'M' }));
+  // level H survives ~30% damage: use it when a logo will cover the middle of the code
+  const level = ['L', 'M', 'Q', 'H'].includes(String(req.query.level).toUpperCase()) ? String(req.query.level).toUpperCase() : 'M';
+  res.send(await QRCode.toBuffer(`${BASE_URL}/m/${r.slug}`, { width: Math.min(Math.max(Number(req.query.size) || 800, 128), 2048), margin: 2, errorCorrectionLevel: level }));
 });
 router.use('/', owner);
 

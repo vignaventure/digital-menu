@@ -49,7 +49,9 @@
         <div class="secret" id="menuUrl"></div>
         <div class="actions" style="margin-top:12px"><button class="ghost" id="copyUrl">Copy link</button><a class="btn ghost" id="openMenu" target="_blank" rel="noopener">Open menu</a></div>
         <h3 style="margin-top:24px">Get your QR code</h3>
-        <div class="actions"><a class="btn" id="dlQr">Download QR (PNG)</a><button class="ghost" id="dlPoster">Download table poster</button></div>
+        <label class="check" style="margin-top:0"><input type="checkbox" id="qrLogo" checked> Show my logo in the center of the QR code</label>
+        <p class="small muted" id="qrLogoNote" style="margin:4px 0 14px"></p>
+        <div class="actions"><a class="btn" id="dlQr" href="#">Download QR (PNG)</a><button class="ghost" id="dlPoster">Download table poster</button></div>
         <div class="note">Print the poster and place it on tables. When you change your menu, the QR code stays the same.</div>
         <p class="small muted" id="lanNote"></p>
       </div>
@@ -207,20 +209,41 @@ $('#catList').addEventListener('click', async (e) => {
 });
 
 // ---------- QR ----------
-function renderQr() {
-  const qr = $('#qrImg'); $('#qrBox').classList.add('skel'); qr.style.opacity = 0;
-  qr.onload = qr.onerror = () => { $('#qrBox').classList.remove('skel'); qr.style.opacity = 1; };
-  qr.src = `/api/v1/qr.png?size=640&v=${Date.now()}`;
+const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not load image')); i.src = src; });
+// The QR code as a canvas, with the restaurant's logo in the middle when it has one and the box is ticked.
+// Logo side = 22% of the code (under 5% of its area) on a white plate, with error correction level H, so it still scans.
+async function makeQr(size) {
+  const logoOn = !!profile.logo && $('#qrLogo').checked;
+  const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d');
+  g.drawImage(await loadImg(`/api/v1/qr.png?size=${size}${logoOn ? '&level=H' : ''}&v=${Date.now()}`), 0, 0, size, size);
+  if (logoOn) {
+    const logo = await loadImg(profile.logo), box = Math.round(size * 0.22), at = Math.round((size - box) / 2), pad = Math.round(box * 0.1);
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(at, at, box, box, box * 0.18); g.fill();
+    const k = Math.min((box - 2 * pad) / logo.width, (box - 2 * pad) / logo.height), w = logo.width * k, h = logo.height * k;
+    g.drawImage(logo, (size - w) / 2, (size - h) / 2, w, h);
+  }
+  return c;
+}
+async function renderQr() {
+  $('#qrBox').classList.add('skel'); const qr = $('#qrImg'); qr.style.opacity = 0;
+  $('#qrLogo').disabled = !profile.logo;
+  $('#qrLogoNote').textContent = profile.logo ? 'Keeps the code scannable. Untick it if you prefer the plain code.' : 'Add a logo under Restaurant details to show it in the center of the QR code.';
+  try { qr.src = (await makeQr(640)).toDataURL('image/png'); } catch { qr.src = `/api/v1/qr.png?size=640&v=${Date.now()}`; }
+  $('#qrBox').classList.remove('skel'); qr.style.opacity = 1;
   $('#menuUrl').textContent = profile.menu_url; $('#openMenu').href = profile.menu_url;
-  $('#dlQr').href = '/api/v1/qr.png?size=1500&download=1'; $('#dlQr').setAttribute('download', '');
   $('#lanNote').textContent = /localhost|127\.0\.0\.1/.test(profile.menu_url) ? 'Tip: this QR points to a local address, so phones cannot open it. Set BASE_URL to your real web address when you deploy.' : '';
 }
+$('#qrLogo').addEventListener('change', renderQr);
+$('#dlQr').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try { const a = document.createElement('a'); a.href = (await makeQr(1500)).toDataURL('image/png'); a.download = `${profile.slug}-menu-qr.png`; a.click(); }
+  catch (er) { toast(er.message); }
+});
 $('#copyUrl').addEventListener('click', () => copyText(profile.menu_url));
 $('#dlPoster').addEventListener('click', async () => {
   const W = 1200, H = 1600, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
   g.fillStyle = profile.theme_color; g.fillRect(0, 0, W, H); g.fillStyle = '#fff'; g.beginPath(); g.roundRect(90, 330, W - 180, 1000, 48); g.fill();
-  const qr = new Image(); qr.src = '/api/v1/qr.png?size=900'; await new Promise((r) => { qr.onload = r; qr.onerror = r; });
-  g.drawImage(qr, 150, 400, 900, 900);
+  g.drawImage(await makeQr(900), 150, 400, 900, 900);
   g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = '800 84px Inter, system-ui, sans-serif'; g.fillText(profile.name.length > 22 ? profile.name.slice(0, 21) + '…' : profile.name, W / 2, 200);
   g.font = '500 42px Inter, system-ui, sans-serif'; g.globalAlpha = .9; g.fillText('Scan to view our menu', W / 2, 270); g.globalAlpha = 1;
   g.font = '500 30px Inter, system-ui, sans-serif'; g.fillText(profile.menu_url.replace(/^https?:\/\//, ''), W / 2, 1440);

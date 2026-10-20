@@ -424,3 +424,14 @@ test('Add menu: browse other restaurants, copy dishes and categories into mine',
   assert.equal((await call('GET', `/api/v1/admin/restaurants/${me.id}/library/items`, { token: srcT })).status, 403);
   assert.equal((await call('GET', '/api/v1/library/items')).status, 401);
 });
+
+test('QR code: error-correction level can be raised for a logo', async () => {
+  const admin = await login('admin@test.com', 'AdminPass123');
+  await call('POST', '/api/v1/admin/restaurants', { token: admin, json: { name: 'Qr Cafe', mobile: '9555500099', password: 'secret12' } });
+  const t = await login('9555500099', 'secret12');
+  const png = async q => (await call('GET', `/api/v1/qr.png?size=400${q}`, { token: t })).body;
+  const plain = await png(''), high = await png('&level=H'), bogus = await png('&level=Z');
+  assert.equal(plain[1], 0x50);                         // a PNG
+  assert.notDeepEqual(plain, high);                     // level H draws a denser code
+  assert.deepEqual(bogus, plain);                       // unknown levels fall back to the default
+});
